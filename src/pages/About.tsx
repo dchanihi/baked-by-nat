@@ -2,10 +2,8 @@ import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import natPortrait from '@/assets/nat-portrait.jpg';
 import { Heart, Sparkles, Star } from 'lucide-react';
-
 const About = () => {
-  return (
-    <div className="min-h-screen flex flex-col">
+  return <div className="min-h-screen flex flex-col">
       <Navigation />
       
       <main className="flex-grow">
@@ -14,11 +12,7 @@ const About = () => {
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="order-2 md:order-1">
               <div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-pink-soft/20">
-                <img
-                  src={natPortrait}
-                  alt="Nat in her cozy kitchen"
-                  className="w-full h-full object-cover aspect-square"
-                />
+                <img alt="Nat in her cozy kitchen" className="w-full h-full object-cover aspect-square" src="/lovable-uploads/a430686c-5b74-4fde-b886-d353475614e3.jpg" />
               </div>
             </div>
             
@@ -138,8 +132,6 @@ const About = () => {
       </main>
       
       <Footer />
-    </div>
-  );
+    </div>;
 };
-
 export default About;
