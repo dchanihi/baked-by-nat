@@ -8,35 +8,44 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Pastel bakery color palette */
+    --background: 30 50% 98%;
+    --foreground: 30 20% 25%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 30 20% 25%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 30 20% 25%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 340 80% 85%;
+    --primary-foreground: 340 60% 30%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 30 40% 95%;
+    --secondary-foreground: 30 20% 25%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 30 35% 92%;
+    --muted-foreground: 30 15% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 30 35% 70%;
+    --accent-foreground: 30 20% 15%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 70% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 30 30% 88%;
+    --input: 30 30% 92%;
+    --ring: 340 80% 85%;
 
-    --radius: 0.5rem;
+    --radius: 1rem;
+    
+    /* Custom bakery tokens */
+    --pink-soft: 340 80% 85%;
+    --pink-medium: 340 70% 75%;
+    --pink-accent: 340 60% 65%;
+    --cream: 30 40% 95%;
+    --cookie: 30 35% 70%;
+    --warm-white: 30 50% 98%;
 
     --sidebar-background: 0 0% 98%;
 
@@ -56,41 +65,49 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 30 20% 12%;
+    --foreground: 30 40% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 30 25% 15%;
+    --card-foreground: 30 40% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 30 25% 15%;
+    --popover-foreground: 30 40% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 340 70% 70%;
+    --primary-foreground: 30 20% 12%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 30 30% 20%;
+    --secondary-foreground: 30 40% 95%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 30 25% 18%;
+    --muted-foreground: 30 20% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 30 35% 55%;
+    --accent-foreground: 30 40% 95%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 30 40% 95%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 30 25% 22%;
+    --input: 30 25% 22%;
+    --ring: 340 70% 70%;
+    
+    --pink-soft: 340 70% 70%;
+    --pink-medium: 340 60% 60%;
+    --pink-accent: 340 50% 50%;
+    --cream: 30 30% 20%;
+    --cookie: 30 35% 55%;
+    --warm-white: 30 20% 12%;
+    
+    --sidebar-background: 30 25% 15%;
+    --sidebar-foreground: 30 40% 95%;
+    --sidebar-primary: 340 70% 70%;
+    --sidebar-primary-foreground: 30 20% 12%;
+    --sidebar-accent: 30 25% 18%;
+    --sidebar-accent-foreground: 30 40% 95%;
+    --sidebar-border: 30 25% 22%;
+    --sidebar-ring: 340 70% 70%;
   }
 }
 
@@ -100,6 +117,16 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-body;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
   }
 }
