@@ -13,7 +13,17 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ['Fredoka', 'system-ui', 'sans-serif'],
+        body: ['Outfit', 'system-ui', 'sans-serif'],
+      },
       colors: {
+        'pink-soft': 'hsl(var(--pink-soft))',
+        'pink-medium': 'hsl(var(--pink-medium))',
+        'pink-accent': 'hsl(var(--pink-accent))',
+        'cream': 'hsl(var(--cream))',
+        'cookie': 'hsl(var(--cookie))',
+        'warm-white': 'hsl(var(--warm-white))',
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
