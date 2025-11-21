@@ -186,9 +186,9 @@ const Admin = () => {
                 back to admin
               </Button>
             </div>
-            <div className="space-y-6">
-              <CategorySettings />
+            <div className="space-y-8">
               <AccountSettings />
+              <CategorySettings />
             </div>
           </div>
         ) : viewingOrder ? (
