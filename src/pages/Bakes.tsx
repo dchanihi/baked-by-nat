@@ -18,10 +18,18 @@ const Bakes = () => {
   const loadBakes = async () => {
     const now = new Date().toISOString();
     
+    // First, update any scheduled posts whose date has passed
+    await supabase
+      .from('bakes')
+      .update({ status: 'published' })
+      .eq('status', 'scheduled')
+      .lte('scheduled_publish_date', now);
+    
+    // Then fetch published bakes (excluding archived)
     const { data, error } = await supabase
       .from('bakes')
       .select('*')
-      .or(`status.eq.published,and(status.eq.scheduled,scheduled_publish_date.lte.${now})`)
+      .eq('status', 'published')
       .order('date', { ascending: false });
 
     if (!error && data) {

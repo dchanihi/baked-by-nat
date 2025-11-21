@@ -258,6 +258,8 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
                 <SelectContent>
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="archive">Archive</SelectItem>
                 </SelectContent>
               </Select>
             </div>
