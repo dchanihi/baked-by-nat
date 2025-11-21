@@ -205,21 +205,21 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
 
           <div>
             <Label htmlFor="description">Description *</Label>
-            <Textarea
+            <Input
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               required
-              rows={4}
             />
           </div>
 
           <div>
             <Label htmlFor="caption">Caption</Label>
-            <Input
+            <Textarea
               id="caption"
               value={formData.caption}
               onChange={(e) => setFormData({ ...formData, caption: e.target.value })}
+              rows={3}
             />
           </div>
 
