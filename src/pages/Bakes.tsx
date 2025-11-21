@@ -3,19 +3,24 @@ import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import BakeCard from '@/components/BakeCard';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Search, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Bake = Tables<'bakes'>;
+type Category = Tables<'categories'>;
 
 const Bakes = () => {
   const [bakes, setBakes] = useState<Bake[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
     loadBakes();
+    loadCategories();
   }, []);
 
   const loadBakes = async () => {
@@ -41,12 +46,26 @@ const Bakes = () => {
     setLoading(false);
   };
 
+  const loadCategories = async () => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('display_order', { ascending: true });
+
+    if (!error && data) {
+      setCategories(data);
+    }
+  };
+
   const filteredBakes = bakes.filter(bake => {
     const query = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = 
       bake.title.toLowerCase().includes(query) ||
-      bake.description.toLowerCase().includes(query)
-    );
+      bake.description.toLowerCase().includes(query);
+    
+    const matchesCategory = !selectedCategory || bake.category === selectedCategory;
+    
+    return matchesSearch && matchesCategory;
   });
 
   return (
@@ -64,8 +83,8 @@ const Bakes = () => {
             </p>
           </div>
           
-          <div className="max-w-md mx-auto mb-12">
-            <div className="relative">
+          <div className="max-w-3xl mx-auto mb-12 space-y-6">
+            <div className="relative max-w-md mx-auto">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 type="text"
@@ -74,6 +93,29 @@ const Bakes = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 font-body"
               />
+            </div>
+            
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Badge
+                variant={selectedCategory === null ? "default" : "outline"}
+                className="cursor-pointer font-body px-4 py-2 transition-all hover:scale-105"
+                onClick={() => setSelectedCategory(null)}
+              >
+                all bakes
+              </Badge>
+              {categories.map((category) => (
+                <Badge
+                  key={category.id}
+                  variant={selectedCategory === category.name ? "default" : "outline"}
+                  className="cursor-pointer font-body px-4 py-2 transition-all hover:scale-105"
+                  onClick={() => setSelectedCategory(category.name)}
+                >
+                  {category.name}
+                  {selectedCategory === category.name && (
+                    <X className="ml-2 h-3 w-3" />
+                  )}
+                </Badge>
+              ))}
             </div>
           </div>
           
