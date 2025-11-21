@@ -1,14 +1,53 @@
 import { useParams, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
-import { bakes } from '@/lib/bakesData';
+import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calendar, Tag } from 'lucide-react';
 
+type Bake = Tables<'bakes'>;
+
 const BakeDetail = () => {
   const { id } = useParams();
-  const bake = bakes.find((b) => b.id === id);
+  const [bake, setBake] = useState<Bake | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadBake();
+  }, [id]);
+
+  const loadBake = async () => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('bakes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (!error && data) {
+      setBake(data);
+    }
+    setLoading(false);
+  };
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navigation />
+        <main className="flex-grow flex items-center justify-center">
+          <p className="text-muted-foreground">loading...</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
   
   if (!bake) {
     return (
@@ -52,7 +91,7 @@ const BakeDetail = () => {
           <div className="grid md:grid-cols-2 gap-12">
             <div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-pink-soft/20">
               <img
-                src={bake.image}
+                src={bake.image_url}
                 alt={bake.title}
                 className="w-full h-full object-cover"
               />
@@ -73,37 +112,43 @@ const BakeDetail = () => {
                 </div>
               </div>
               
-              <div>
-                <Badge className="bg-pink-soft text-primary-foreground font-body mb-4">
-                  {bake.category}
-                </Badge>
-              </div>
+              {bake.category && (
+                <div>
+                  <Badge className="bg-pink-soft text-primary-foreground font-body mb-4">
+                    {bake.category}
+                  </Badge>
+                </div>
+              )}
               
-              <p className="text-lg font-body text-pink-accent font-medium">
-                {bake.caption}
-              </p>
+              {bake.caption && (
+                <p className="text-lg font-body text-pink-accent font-medium">
+                  {bake.caption}
+                </p>
+              )}
               
               <p className="text-base font-body text-foreground leading-relaxed">
                 {bake.description}
               </p>
               
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Tag className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-body text-muted-foreground">tags:</span>
+              {bake.tags && bake.tags.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Tag className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-body text-muted-foreground">tags:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {bake.tags.map((tag) => (
+                      <Badge 
+                        key={tag} 
+                        variant="outline" 
+                        className="border-pink-soft text-foreground font-body"
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {bake.tags.map((tag) => (
-                    <Badge 
-                      key={tag} 
-                      variant="outline" 
-                      className="border-pink-soft text-foreground font-body"
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </section>

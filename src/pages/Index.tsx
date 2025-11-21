@@ -1,13 +1,40 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import BakeCard from '@/components/BakeCard';
 import { Button } from '@/components/ui/button';
-import { bakes } from '@/lib/bakesData';
+import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 import heroImage from '@/assets/hero-baking.jpg';
 import { Sparkles } from 'lucide-react';
+
+type Bake = Tables<'bakes'>;
+
 const Index = () => {
-  const latestBakes = bakes.slice(0, 6);
+  const [latestBakes, setLatestBakes] = useState<Bake[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadBakes();
+  }, []);
+
+  const loadBakes = async () => {
+    const now = new Date().toISOString();
+    
+    const { data, error } = await supabase
+      .from('bakes')
+      .select('*')
+      .or(`status.eq.published,and(status.eq.scheduled,scheduled_publish_date.lte.${now})`)
+      .order('date', { ascending: false })
+      .limit(6);
+
+    if (!error && data) {
+      setLatestBakes(data);
+    }
+    setLoading(false);
+  };
+
   const scrollToBakes = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     const bakesSection = document.getElementById('latest-bakes');
@@ -59,7 +86,17 @@ const Index = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-              {latestBakes.map(bake => <BakeCard key={bake.id} bake={bake} />)}
+              {loading ? (
+                <div className="col-span-full text-center py-12">
+                  <p className="text-muted-foreground">loading bakes...</p>
+                </div>
+              ) : latestBakes.length === 0 ? (
+                <div className="col-span-full text-center py-12">
+                  <p className="text-muted-foreground">no bakes yet ♡</p>
+                </div>
+              ) : (
+                latestBakes.map(bake => <BakeCard key={bake.id} bake={bake} />)
+              )}
             </div>
             
             <div className="text-center">
