@@ -156,146 +156,156 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <Label htmlFor="image">Image *</Label>
-            <div className="mt-2">
-              {imagePreview && (
-                <div className="mb-4 rounded-lg overflow-hidden max-w-md">
-                  <img src={imagePreview} alt="Preview" className="w-full h-auto" />
+        <form onSubmit={handleSubmit}>
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Left Column - Image Section */}
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="image">Image *</Label>
+                <div className="mt-2">
+                  {imagePreview && (
+                    <div className="mb-4 rounded-lg overflow-hidden">
+                      <img src={imagePreview} alt="Preview" className="w-full h-auto" />
+                    </div>
+                  )}
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    required={!bake}
+                  />
                 </div>
-              )}
-              <Input
-                id="image"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                required={!bake}
-              />
-            </div>
-            <div className="mt-4">
-              <Label htmlFor="image-position">Thumbnail Focus Point</Label>
-              <Select
-                value={formData.image_position}
-                onValueChange={(value) => setFormData({ ...formData, image_position: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="center">Center</SelectItem>
-                  <SelectItem value="top">Top</SelectItem>
-                  <SelectItem value="bottom">Bottom</SelectItem>
-                  <SelectItem value="left">Left</SelectItem>
-                  <SelectItem value="right">Right</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="title">Title *</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="description">Description *</Label>
-            <Input
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="caption">Caption</Label>
-            <Textarea
-              id="caption"
-              value={formData.caption}
-              onChange={(e) => setFormData({ ...formData, caption: e.target.value })}
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.name}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="image-position">Thumbnail Focus Point</Label>
+                <Select
+                  value={formData.image_position}
+                  onValueChange={(value) => setFormData({ ...formData, image_position: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="center">Center</SelectItem>
+                    <SelectItem value="top">Top</SelectItem>
+                    <SelectItem value="bottom">Bottom</SelectItem>
+                    <SelectItem value="left">Left</SelectItem>
+                    <SelectItem value="right">Right</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div>
-              <Label htmlFor="tags">Tags (comma separated)</Label>
-              <Input
-                id="tags"
-                value={formData.tags}
-                onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                placeholder="e.g., chocolate, vanilla"
-              />
+            {/* Right Column - Form Fields */}
+            <div className="space-y-6">
+              <div>
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="description">Description *</Label>
+                <Input
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="caption">Caption</Label>
+                <Textarea
+                  id="caption"
+                  value={formData.caption}
+                  onChange={(e) => setFormData({ ...formData, caption: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="tags">Tags (comma separated)</Label>
+                  <Input
+                    id="tags"
+                    value={formData.tags}
+                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                    placeholder="e.g., chocolate, vanilla"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="date">Date *</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="status">Status *</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="published">Published</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="archive">Archive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="scheduled">Schedule Publish Date (optional)</Label>
+                <Input
+                  id="scheduled"
+                  type="datetime-local"
+                  value={formData.scheduled_publish_date}
+                  onChange={(e) => setFormData({ ...formData, scheduled_publish_date: e.target.value })}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="date">Date *</Label>
-              <Input
-                id="date"
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="status">Status *</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) => setFormData({ ...formData, status: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="archive">Archive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="scheduled">Schedule Publish Date (optional)</Label>
-            <Input
-              id="scheduled"
-              type="datetime-local"
-              value={formData.scheduled_publish_date}
-              onChange={(e) => setFormData({ ...formData, scheduled_publish_date: e.target.value })}
-            />
-          </div>
-
-          <div className="flex gap-4">
+          {/* Action Buttons - Full Width Below */}
+          <div className="flex gap-4 mt-8">
             <Button
               type="submit"
               disabled={loading || uploading}
