@@ -44,6 +44,14 @@ const Navigation = () => {
               about
             </Link>
             <Link
+              to="/order"
+              className={`font-body text-sm transition-colors hover:text-pink-accent ${
+                isActive('/order') ? 'text-pink-accent font-medium' : 'text-foreground'
+              }`}
+            >
+              order
+            </Link>
+            <Link
               to="/contact"
               className={`font-body text-sm transition-colors hover:text-pink-accent ${
                 isActive('/contact') ? 'text-pink-accent font-medium' : 'text-foreground'
