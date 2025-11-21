@@ -149,7 +149,7 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
   };
 
   return (
-    <Card className="max-w-3xl mx-auto">
+    <Card className="max-w-6xl mx-auto">
       <CardHeader>
         <CardTitle className="font-display">
           {bake ? 'Edit Bake' : 'Create New Bake'}
