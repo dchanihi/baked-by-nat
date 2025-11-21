@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import BakeCard from '@/components/BakeCard';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -10,6 +12,7 @@ type Bake = Tables<'bakes'>;
 const Bakes = () => {
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadBakes();
@@ -38,6 +41,14 @@ const Bakes = () => {
     setLoading(false);
   };
 
+  const filteredBakes = bakes.filter(bake => {
+    const query = searchQuery.toLowerCase();
+    return (
+      bake.title.toLowerCase().includes(query) ||
+      bake.description.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navigation />
@@ -53,17 +64,32 @@ const Bakes = () => {
             </p>
           </div>
           
+          <div className="max-w-md mx-auto mb-12">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                type="text"
+                placeholder="search for a bake..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 font-body"
+              />
+            </div>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {loading ? (
               <div className="col-span-full text-center py-12">
                 <p className="text-muted-foreground">loading bakes...</p>
               </div>
-            ) : bakes.length === 0 ? (
+            ) : filteredBakes.length === 0 ? (
               <div className="col-span-full text-center py-12">
-                <p className="text-muted-foreground">no bakes yet ♡</p>
+                <p className="text-muted-foreground">
+                  {searchQuery ? 'no bakes found matching your search ♡' : 'no bakes yet ♡'}
+                </p>
               </div>
             ) : (
-              bakes.map((bake) => (
+              filteredBakes.map((bake) => (
                 <BakeCard key={bake.id} bake={bake} />
               ))
             )}
