@@ -10,25 +10,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
 interface Bake {
   id: string;
   title: string;
   image_url: string;
 }
-
 const Order = () => {
   const [searchParams] = useSearchParams();
   const preselectedBakeId = searchParams.get('bakeId');
-  
-  const [orderType, setOrderType] = useState<'existing_bake' | 'custom'>(
-    preselectedBakeId ? 'existing_bake' : 'custom'
-  );
+  const [orderType, setOrderType] = useState<'existing_bake' | 'custom'>(preselectedBakeId ? 'existing_bake' : 'custom');
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [selectedBakeId, setSelectedBakeId] = useState(preselectedBakeId || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sameAsRequestedDate, setSameAsRequestedDate] = useState(true);
-  
   const [formData, setFormData] = useState({
     customerName: '',
     customerEmail: '',
@@ -39,29 +33,25 @@ const Order = () => {
     customDescription: '',
     additionalNotes: ''
   });
-
   useEffect(() => {
     fetchBakes();
   }, []);
-
   const fetchBakes = async () => {
-    const { data, error } = await supabase
-      .from('bakes')
-      .select('id, title, image_url')
-      .order('date', { ascending: false });
-    
+    const {
+      data,
+      error
+    } = await supabase.from('bakes').select('id, title, image_url').order('date', {
+      ascending: false
+    });
     if (error) {
       console.error('Error fetching bakes:', error);
       return;
     }
-    
     setBakes(data || []);
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     try {
       const orderData = {
         customer_name: formData.customerName,
@@ -69,24 +59,19 @@ const Order = () => {
         customer_phone: formData.customerPhone || null,
         order_type: orderType,
         bake_id: orderType === 'existing_bake' ? selectedBakeId : null,
-        bake_title: orderType === 'existing_bake' 
-          ? bakes.find(b => b.id === selectedBakeId)?.title 
-          : null,
+        bake_title: orderType === 'existing_bake' ? bakes.find(b => b.id === selectedBakeId)?.title : null,
         custom_description: orderType === 'custom' ? formData.customDescription : null,
         quantity: formData.quantity,
         requested_date: formData.requestedDate || null,
-        pickup_date: sameAsRequestedDate ? (formData.requestedDate || null) : (formData.pickupDate || null),
+        pickup_date: sameAsRequestedDate ? formData.requestedDate || null : formData.pickupDate || null,
         additional_notes: formData.additionalNotes || null
       };
-
-      const { error } = await supabase
-        .from('orders')
-        .insert(orderData);
-
+      const {
+        error
+      } = await supabase.from('orders').insert(orderData);
       if (error) throw error;
-
       toast.success('order submitted successfully! 🎉');
-      
+
       // Reset form
       setFormData({
         customerName: '',
@@ -108,9 +93,7 @@ const Order = () => {
       setIsSubmitting(false);
     }
   };
-
-  return (
-    <div className="min-h-screen flex flex-col">
+  return <div className="min-h-screen flex flex-col">
       <Navigation />
       
       <main className="flex-grow">
@@ -120,7 +103,7 @@ const Order = () => {
               order your treats
             </h1>
             <p className="text-base md:text-lg font-body text-muted-foreground">
-              pick from our bakes or describe your dream dessert ♡
+              pick from my bakes or describe your dream dessert ♡
             </p>
           </div>
 
@@ -142,8 +125,7 @@ const Order = () => {
             </div>
 
             {/* Existing Bake Selection */}
-            {orderType === 'existing_bake' && (
-              <div className="space-y-3">
+            {orderType === 'existing_bake' && <div className="space-y-3">
                 <Label htmlFor="bakeId" className="text-base font-display">
                   select a bake
                 </Label>
@@ -152,73 +134,53 @@ const Order = () => {
                     <SelectValue placeholder="pick your favorite..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {bakes.map((bake) => (
-                      <SelectItem key={bake.id} value={bake.id}>
+                    {bakes.map(bake => <SelectItem key={bake.id} value={bake.id}>
                         {bake.title}
-                      </SelectItem>
-                    ))}
+                      </SelectItem>)}
                   </SelectContent>
                 </Select>
-              </div>
-            )}
+              </div>}
 
             {/* Custom Order Description */}
-            {orderType === 'custom' && (
-              <div className="space-y-3">
+            {orderType === 'custom' && <div className="space-y-3">
                 <Label htmlFor="customDescription" className="text-base font-display">
                   describe your dream dessert
                 </Label>
-                <Textarea
-                  id="customDescription"
-                  value={formData.customDescription}
-                  onChange={(e) => setFormData({ ...formData, customDescription: e.target.value })}
-                  placeholder="tell us about flavors, colors, decorations, occasion..."
-                  required
-                  rows={4}
-                  className="resize-none"
-                />
-              </div>
-            )}
+                <Textarea id="customDescription" value={formData.customDescription} onChange={e => setFormData({
+              ...formData,
+              customDescription: e.target.value
+            })} required rows={4} className="resize-none" placeholder="tell us about the good, flavors, colors, decorations, occasion..." />
+              </div>}
 
             {/* Customer Information */}
             <div className="space-y-3">
               <Label htmlFor="customerName" className="text-base font-display">
                 your name
               </Label>
-              <Input
-                id="customerName"
-                value={formData.customerName}
-                onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                required
-                placeholder="nat"
-              />
+              <Input id="customerName" value={formData.customerName} onChange={e => setFormData({
+              ...formData,
+              customerName: e.target.value
+            })} required placeholder="nat" />
             </div>
 
             <div className="space-y-3">
               <Label htmlFor="customerEmail" className="text-base font-display">
                 your email
               </Label>
-              <Input
-                id="customerEmail"
-                type="email"
-                value={formData.customerEmail}
-                onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
-                required
-                placeholder="nat@example.com"
-              />
+              <Input id="customerEmail" type="email" value={formData.customerEmail} onChange={e => setFormData({
+              ...formData,
+              customerEmail: e.target.value
+            })} required placeholder="nat@example.com" />
             </div>
 
             <div className="space-y-3">
               <Label htmlFor="customerPhone" className="text-base font-display">
                 phone number (optional)
               </Label>
-              <Input
-                id="customerPhone"
-                type="tel"
-                value={formData.customerPhone}
-                onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                placeholder="+1 (555) 123-4567"
-              />
+              <Input id="customerPhone" type="tel" value={formData.customerPhone} onChange={e => setFormData({
+              ...formData,
+              customerPhone: e.target.value
+            })} placeholder="+1 (555) 123-4567" />
             </div>
 
             {/* Order Details */}
@@ -227,79 +189,51 @@ const Order = () => {
                 <Label htmlFor="quantity" className="text-base font-display">
                   quantity
                 </Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min="1"
-                  value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
-                  required
-                />
+                <Input id="quantity" type="number" min="1" value={formData.quantity} onChange={e => setFormData({
+                ...formData,
+                quantity: parseInt(e.target.value)
+              })} required />
               </div>
 
               <div className="space-y-3">
                 <Label htmlFor="requestedDate" className="text-base font-display">
                   when do you need it?
                 </Label>
-                <Input
-                  id="requestedDate"
-                  type="date"
-                  value={formData.requestedDate}
-                  onChange={(e) => setFormData({ ...formData, requestedDate: e.target.value })}
-                  min={new Date().toISOString().split('T')[0]}
-                />
+                <Input id="requestedDate" type="date" value={formData.requestedDate} onChange={e => setFormData({
+                ...formData,
+                requestedDate: e.target.value
+              })} min={new Date().toISOString().split('T')[0]} />
               </div>
             </div>
 
             <div className="flex items-center space-x-2">
-              <Checkbox
-                id="sameDate"
-                checked={sameAsRequestedDate}
-                onCheckedChange={(checked) => setSameAsRequestedDate(checked as boolean)}
-              />
-              <Label
-                htmlFor="sameDate"
-                className="text-sm font-display cursor-pointer"
-              >
+              <Checkbox id="sameDate" checked={sameAsRequestedDate} onCheckedChange={checked => setSameAsRequestedDate(checked as boolean)} />
+              <Label htmlFor="sameDate" className="text-sm font-display cursor-pointer">
                 pick up on the same date
               </Label>
             </div>
 
-            {!sameAsRequestedDate && (
-              <div className="space-y-3">
+            {!sameAsRequestedDate && <div className="space-y-3">
                 <Label htmlFor="pickupDate" className="text-base font-display">
                   when will you pick up?
                 </Label>
-                <Input
-                  id="pickupDate"
-                  type="date"
-                  value={formData.pickupDate}
-                  onChange={(e) => setFormData({ ...formData, pickupDate: e.target.value })}
-                  min={new Date().toISOString().split('T')[0]}
-                />
-              </div>
-            )}
+                <Input id="pickupDate" type="date" value={formData.pickupDate} onChange={e => setFormData({
+              ...formData,
+              pickupDate: e.target.value
+            })} min={new Date().toISOString().split('T')[0]} />
+              </div>}
 
             <div className="space-y-3">
               <Label htmlFor="additionalNotes" className="text-base font-display">
                 additional notes (optional)
               </Label>
-              <Textarea
-                id="additionalNotes"
-                value={formData.additionalNotes}
-                onChange={(e) => setFormData({ ...formData, additionalNotes: e.target.value })}
-                placeholder="any allergies, dietary restrictions, or special requests?"
-                rows={3}
-                className="resize-none"
-              />
+              <Textarea id="additionalNotes" value={formData.additionalNotes} onChange={e => setFormData({
+              ...formData,
+              additionalNotes: e.target.value
+            })} placeholder="any allergies, dietary restrictions, or special requests?" rows={3} className="resize-none" />
             </div>
 
-            <Button 
-              type="submit" 
-              size="lg" 
-              className="w-full font-display text-lg"
-              disabled={isSubmitting}
-            >
+            <Button type="submit" size="lg" className="w-full font-display text-lg" disabled={isSubmitting}>
               {isSubmitting ? 'submitting...' : 'submit order'}
             </Button>
           </form>
@@ -307,8 +241,6 @@ const Order = () => {
       </main>
       
       <Footer />
-    </div>
-  );
+    </div>;
 };
-
 export default Order;
