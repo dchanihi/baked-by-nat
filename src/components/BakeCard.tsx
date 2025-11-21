@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Bake } from '@/lib/bakesData';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
 
 interface BakeCardProps {
   bake: Bake;
@@ -8,8 +9,8 @@ interface BakeCardProps {
 
 const BakeCard = ({ bake }: BakeCardProps) => {
   return (
-    <Link to={`/bakes/${bake.id}`} className="group">
-      <Card className="overflow-hidden border-2 hover:border-pink-soft hover:shadow-lg transition-all duration-300 h-full">
+    <Card className="overflow-hidden border-2 hover:border-pink-soft hover:shadow-lg transition-all duration-300 h-full">
+      <Link to={`/bakes/${bake.id}`} className="group block">
         <div className="aspect-square overflow-hidden bg-secondary">
           <img
             src={bake.image}
@@ -34,8 +35,15 @@ const BakeCard = ({ bake }: BakeCardProps) => {
             {bake.caption}
           </p>
         </CardContent>
-      </Card>
-    </Link>
+      </Link>
+      <div className="px-6 pb-6">
+        <Link to={`/order?bakeId=${bake.id}`}>
+          <Button variant="outline" size="sm" className="w-full font-display">
+            order this
+          </Button>
+        </Link>
+      </div>
+    </Card>
   );
 };
 
