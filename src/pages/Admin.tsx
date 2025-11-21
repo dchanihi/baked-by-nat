@@ -136,25 +136,6 @@ const Admin = () => {
     <div className="min-h-screen bg-secondary">
       <Navigation />
 
-      <div className="bg-background border-b border-border">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-end gap-3">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowSettings(!showSettings)}
-              size="sm"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </Button>
-            <Button variant="outline" onClick={handleSignOut} size="sm">
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </div>
-
       <main className="container mx-auto px-4 py-8">
         {showSettings ? (
           <div className="space-y-6">
@@ -162,31 +143,73 @@ const Admin = () => {
               <h1 className="text-3xl font-display font-bold text-primary-foreground">
                 settings
               </h1>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowSettings(false)}
-              >
-                Back to Bakes
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowSettings(false)}
+                >
+                  Back to Bakes
+                </Button>
+                {isAdmin && (
+                  <Button variant="outline" onClick={handleSignOut} size="sm">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </Button>
+                )}
+              </div>
             </div>
             <CategorySettings />
           </div>
         ) : isCreating ? (
-          <BakeEditor
-            bake={editingBake}
-            onSave={handleSaveComplete}
-            onCancel={handleCancel}
-          />
+          <>
+            <div className="flex items-center justify-end gap-3 mb-6">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowSettings(!showSettings)}
+                size="sm"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </Button>
+              {isAdmin && (
+                <Button variant="outline" onClick={handleSignOut} size="sm">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              )}
+            </div>
+            <BakeEditor
+              bake={editingBake}
+              onSave={handleSaveComplete}
+              onCancel={handleCancel}
+            />
+          </>
         ) : (
           <>
             <div className="flex justify-between items-center mb-8">
               <h1 className="text-3xl font-display font-bold text-primary-foreground">
                 manage bakes
               </h1>
-              <Button onClick={handleCreateNew} className="bg-pink-soft hover:bg-pink-medium">
-                <Plus className="w-4 h-4 mr-2" />
-                New Bake
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowSettings(!showSettings)}
+                  size="sm"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Button>
+                <Button onClick={handleCreateNew} className="bg-pink-soft hover:bg-pink-medium">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Bake
+                </Button>
+                {isAdmin && (
+                  <Button variant="outline" onClick={handleSignOut} size="sm">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </Button>
+                )}
+              </div>
             </div>
             <BakesList
               bakes={bakes}
