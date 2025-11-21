@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-import { Plus, LogOut } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { BakesList } from '@/components/admin/BakesList';
 import { BakeEditor } from '@/components/admin/BakeEditor';
 import { CategorySettings } from '@/components/admin/CategorySettings';
@@ -75,11 +75,6 @@ const Admin = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/auth');
-  };
-
   const handleCreateNew = () => {
     setEditingBake(null);
     setIsCreating(true);
@@ -145,57 +140,31 @@ const Admin = () => {
               <h1 className="text-3xl font-display font-bold text-primary-foreground">
                 settings
               </h1>
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSearchParams({})}
-                >
-                  Back to Bakes
-                </Button>
-                {isAdmin && (
-                  <Button variant="outline" onClick={handleSignOut} size="sm">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out
-                  </Button>
-                )}
-              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => setSearchParams({})}
+              >
+                Back to Bakes
+              </Button>
             </div>
             <CategorySettings />
           </div>
         ) : isCreating ? (
-          <>
-            <div className="flex items-center justify-end gap-3 mb-6">
-              {isAdmin && (
-                <Button variant="outline" onClick={handleSignOut} size="sm">
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
-              )}
-            </div>
-            <BakeEditor
-              bake={editingBake}
-              onSave={handleSaveComplete}
-              onCancel={handleCancel}
-            />
-          </>
+          <BakeEditor
+            bake={editingBake}
+            onSave={handleSaveComplete}
+            onCancel={handleCancel}
+          />
         ) : (
           <>
             <div className="flex justify-between items-center mb-8">
               <h1 className="text-3xl font-display font-bold text-primary-foreground">
                 manage bakes
               </h1>
-              <div className="flex items-center gap-3">
-                <Button onClick={handleCreateNew} className="bg-pink-soft hover:bg-pink-medium">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Bake
-                </Button>
-                {isAdmin && (
-                  <Button variant="outline" onClick={handleSignOut} size="sm">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out
-                  </Button>
-                )}
-              </div>
+              <Button onClick={handleCreateNew} className="bg-pink-soft hover:bg-pink-medium">
+                <Plus className="w-4 h-4 mr-2" />
+                New Bake
+              </Button>
             </div>
             <BakesList
               bakes={bakes}
