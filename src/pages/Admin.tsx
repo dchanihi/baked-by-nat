@@ -27,7 +27,7 @@ const Admin = () => {
   const [editingBake, setEditingBake] = useState<Bake | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [activeTab, setActiveTab] = useState('bakes');
+  const [activeTab, setActiveTab] = useState('overview');
   
   const showSettings = searchParams.get('view') === 'settings';
 
@@ -202,10 +202,18 @@ const Admin = () => {
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full max-w-2xl grid-cols-3">
-              <TabsTrigger value="bakes">manage bakes</TabsTrigger>
               <TabsTrigger value="overview">order overview</TabsTrigger>
               <TabsTrigger value="orders">view orders</TabsTrigger>
+              <TabsTrigger value="bakes">manage bakes</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="overview" className="space-y-6">
+              <OrderOverview orders={orders} />
+            </TabsContent>
+
+            <TabsContent value="orders" className="space-y-6">
+              <OrdersList orders={orders} onView={handleViewOrder} />
+            </TabsContent>
 
             <TabsContent value="bakes" className="space-y-6">
               <div className="flex justify-end">
@@ -219,14 +227,6 @@ const Admin = () => {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
               />
-            </TabsContent>
-
-            <TabsContent value="overview" className="space-y-6">
-              <OrderOverview orders={orders} />
-            </TabsContent>
-
-            <TabsContent value="orders" className="space-y-6">
-              <OrdersList orders={orders} onView={handleViewOrder} />
             </TabsContent>
           </Tabs>
         )}
