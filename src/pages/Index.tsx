@@ -27,7 +27,7 @@ const Index = () => {
                 hi, i'm nat 🍰
               </h1>
               <h2 className="text-xl md:text-2xl font-body text-pink-accent">
-                welcome to baked by nat – a cozy corner for all things sweet & homemade.
+                a baker proud to call edmonton her home              
               </h2>
               <p className="text-base md:text-lg font-body text-foreground leading-relaxed">
                 i'm a home baker who loves creating cute, cozy desserts that make people smile! let me share with you my latest bakes and sweet inspiration. whether it's fluffy cupcakes, buttery cookies, or dreamy cakes, everything is baked with love ♡
