@@ -150,40 +150,40 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
 
   return (
     <Card className="max-w-6xl mx-auto">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <CardTitle className="font-display">
           {bake ? 'Edit Bake' : 'Create New Bake'}
         </CardTitle>
+        <div className="flex gap-2">
+          <Button
+            type="submit"
+            disabled={loading || uploading}
+            size="sm"
+            form="bake-form"
+          >
+            {loading || uploading ? (
+              'Saving...'
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={loading || uploading}
+            size="sm"
+          >
+            <X className="w-4 h-4 mr-2" />
+            Cancel
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit}>
-          {/* Action Buttons - Top */}
-          <div className="flex gap-4 mb-8">
-            <Button
-              type="submit"
-              disabled={loading || uploading}
-              className="flex-1"
-            >
-              {loading || uploading ? (
-                'Saving...'
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Bake
-                </>
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={loading || uploading}
-            >
-              <X className="w-4 h-4 mr-2" />
-              Cancel
-            </Button>
-          </div>
-
+        <form id="bake-form" onSubmit={handleSubmit}>
           <div className="grid md:grid-cols-2 gap-8">
             {/* Left Column - Image Section */}
             <div className="space-y-4">
