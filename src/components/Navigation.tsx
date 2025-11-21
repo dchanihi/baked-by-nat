@@ -1,10 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Heart } from 'lucide-react';
+import { Heart, Settings } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
   
   const isActive = (path: string) => location.pathname === path;
+  const isAdminRoute = location.pathname === '/admin';
   
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -67,6 +68,17 @@ const Navigation = () => {
             >
               admin
             </Link>
+            {isAdminRoute && (
+              <Link
+                to="/admin?view=settings"
+                className={`font-body text-sm transition-colors hover:text-pink-accent flex items-center gap-1 ${
+                  location.search === '?view=settings' ? 'text-pink-accent font-medium' : 'text-foreground'
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+                settings
+              </Link>
+            )}
           </div>
         </div>
       </div>
