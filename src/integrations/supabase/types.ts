@@ -68,6 +68,7 @@ export type Database = {
           customer_phone: string | null
           id: string
           order_type: Database["public"]["Enums"]["order_type"]
+          pickup_date: string | null
           quantity: number
           requested_date: string | null
           status: Database["public"]["Enums"]["order_status"]
@@ -84,6 +85,7 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           order_type: Database["public"]["Enums"]["order_type"]
+          pickup_date?: string | null
           quantity?: number
           requested_date?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -100,6 +102,7 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           order_type?: Database["public"]["Enums"]["order_type"]
+          pickup_date?: string | null
           quantity?: number
           requested_date?: string | null
           status?: Database["public"]["Enums"]["order_status"]

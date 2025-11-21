@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -26,6 +27,7 @@ const Order = () => {
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [selectedBakeId, setSelectedBakeId] = useState(preselectedBakeId || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sameAsRequestedDate, setSameAsRequestedDate] = useState(true);
   
   const [formData, setFormData] = useState({
     customerName: '',
@@ -33,6 +35,7 @@ const Order = () => {
     customerPhone: '',
     quantity: 1,
     requestedDate: '',
+    pickupDate: '',
     customDescription: '',
     additionalNotes: ''
   });
@@ -72,6 +75,7 @@ const Order = () => {
         custom_description: orderType === 'custom' ? formData.customDescription : null,
         quantity: formData.quantity,
         requested_date: formData.requestedDate || null,
+        pickup_date: sameAsRequestedDate ? (formData.requestedDate || null) : (formData.pickupDate || null),
         additional_notes: formData.additionalNotes || null
       };
 
@@ -90,11 +94,13 @@ const Order = () => {
         customerPhone: '',
         quantity: 1,
         requestedDate: '',
+        pickupDate: '',
         customDescription: '',
         additionalNotes: ''
       });
       setSelectedBakeId('');
       setOrderType('custom');
+      setSameAsRequestedDate(true);
     } catch (error) {
       console.error('Error submitting order:', error);
       toast.error('failed to submit order. please try again.');
@@ -244,6 +250,35 @@ const Order = () => {
                 />
               </div>
             </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="sameDate"
+                checked={sameAsRequestedDate}
+                onCheckedChange={(checked) => setSameAsRequestedDate(checked as boolean)}
+              />
+              <Label
+                htmlFor="sameDate"
+                className="text-sm font-display cursor-pointer"
+              >
+                pick up on the same date
+              </Label>
+            </div>
+
+            {!sameAsRequestedDate && (
+              <div className="space-y-3">
+                <Label htmlFor="pickupDate" className="text-base font-display">
+                  when will you pick up?
+                </Label>
+                <Input
+                  id="pickupDate"
+                  type="date"
+                  value={formData.pickupDate}
+                  onChange={(e) => setFormData({ ...formData, pickupDate: e.target.value })}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+            )}
 
             <div className="space-y-3">
               <Label htmlFor="additionalNotes" className="text-base font-display">
