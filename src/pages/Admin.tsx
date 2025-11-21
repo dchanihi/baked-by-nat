@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BakesList } from '@/components/admin/BakesList';
 import { BakeEditor } from '@/components/admin/BakeEditor';
 import { CategorySettings } from '@/components/admin/CategorySettings';
+import { AccountSettings } from '@/components/admin/AccountSettings';
 import { OrdersList } from '@/components/admin/OrdersList';
 import { OrderDetails } from '@/components/admin/OrderDetails';
 import { OrderOverview } from '@/components/admin/OrderOverview';
@@ -185,7 +186,10 @@ const Admin = () => {
                 back to admin
               </Button>
             </div>
-            <CategorySettings />
+            <div className="space-y-6">
+              <CategorySettings />
+              <AccountSettings />
+            </div>
           </div>
         ) : viewingOrder ? (
           <OrderDetails

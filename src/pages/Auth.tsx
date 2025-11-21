@@ -15,6 +15,8 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
+  const [showResetForm, setShowResetForm] = useState(false);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -78,6 +80,32 @@ const Auth = () => {
     setLoading(false);
   };
 
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/auth?reset=true`,
+    });
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Check your email',
+        description: 'We sent you a password reset link.',
+      });
+      setShowResetForm(false);
+      setResetEmail('');
+    }
+
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-secondary p-4">
       <Card className="w-full max-w-md">
@@ -89,13 +117,38 @@ const Auth = () => {
           <CardDescription className="font-body">Admin Portal</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
+          {showResetForm ? (
+            <form onSubmit={handlePasswordReset} className="space-y-4">
+              <div>
+                <Label htmlFor="reset-email">Email</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Sending...' : 'Send Reset Link'}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => setShowResetForm(false)}
+              >
+                Back to Sign In
+              </Button>
+            </form>
+          ) : (
+            <Tabs defaultValue="signin">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="signin">Sign In</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="signin">
+              <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div>
                   <Label htmlFor="signin-email">Email</Label>
@@ -119,6 +172,14 @@ const Auth = () => {
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? 'Signing in...' : 'Sign In'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="link"
+                  className="w-full text-sm"
+                  onClick={() => setShowResetForm(true)}
+                >
+                  Forgot password?
                 </Button>
               </form>
             </TabsContent>
@@ -161,6 +222,7 @@ const Auth = () => {
               </form>
             </TabsContent>
           </Tabs>
+          )}
         </CardContent>
       </Card>
     </div>
