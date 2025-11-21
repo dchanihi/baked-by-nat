@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-import { Heart, Plus, LogOut } from 'lucide-react';
+import { Plus, LogOut } from 'lucide-react';
 import { BakesList } from '@/components/admin/BakesList';
 import { BakeEditor } from '@/components/admin/BakeEditor';
+import Navigation from '@/components/Navigation';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Bake = Tables<'bakes'>;
@@ -131,22 +132,18 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-secondary">
-      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Heart className="w-5 h-5 fill-pink-soft" />
-              <span className="text-xl font-display font-semibold text-primary-foreground">
-                baked by nat - admin
-              </span>
-            </div>
-            <Button variant="outline" onClick={handleSignOut}>
+      <Navigation />
+
+      <div className="bg-background border-b border-border">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-end gap-3">
+            <Button variant="outline" onClick={handleSignOut} size="sm">
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
             </Button>
           </div>
         </div>
-      </nav>
+      </div>
 
       <main className="container mx-auto px-4 py-8">
         {isCreating ? (
