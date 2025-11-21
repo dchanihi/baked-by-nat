@@ -24,8 +24,9 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(bake?.image_url || '');
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
-  const [formData, setFormData] = useState({
+  const initialFormData = {
     title: bake?.title || '',
     description: bake?.description || '',
     caption: bake?.caption || '',
@@ -37,11 +38,29 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
       ? new Date(bake.scheduled_publish_date).toISOString().slice(0, 16)
       : '',
     image_position: bake?.image_position || 'center',
-  });
+  };
+  
+  const [formData, setFormData] = useState(initialFormData);
 
   useEffect(() => {
     loadCategories();
   }, []);
+
+  useEffect(() => {
+    const hasChanges = 
+      formData.title !== initialFormData.title ||
+      formData.description !== initialFormData.description ||
+      formData.caption !== initialFormData.caption ||
+      formData.category !== initialFormData.category ||
+      formData.tags !== initialFormData.tags ||
+      formData.date !== initialFormData.date ||
+      formData.status !== initialFormData.status ||
+      formData.scheduled_publish_date !== initialFormData.scheduled_publish_date ||
+      formData.image_position !== initialFormData.image_position ||
+      imageFile !== null;
+    
+    setHasUnsavedChanges(hasChanges);
+  }, [formData, imageFile, initialFormData]);
 
   const loadCategories = async () => {
     const { data } = await supabase
@@ -151,9 +170,17 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
   return (
     <Card className="max-w-6xl mx-auto">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <CardTitle className="font-display">
-          {bake ? 'Edit Bake' : 'Create New Bake'}
-        </CardTitle>
+        <div className="flex items-center gap-3">
+          <CardTitle className="font-display">
+            {bake ? 'Edit Bake' : 'Create New Bake'}
+          </CardTitle>
+          {hasUnsavedChanges && (
+            <span className="text-sm text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-amber-600 dark:bg-amber-400 animate-pulse" />
+              Unsaved changes
+            </span>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button
             type="submit"
