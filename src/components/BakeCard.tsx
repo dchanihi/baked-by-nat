@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Bake } from '@/lib/bakesData';
+import type { Tables } from '@/integrations/supabase/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+
+type Bake = Tables<'bakes'>;
 
 interface BakeCardProps {
   bake: Bake;
@@ -13,7 +15,7 @@ const BakeCard = ({ bake }: BakeCardProps) => {
       <Link to={`/bakes/${bake.id}`} className="group block">
         <div className="aspect-square overflow-hidden bg-secondary">
           <img
-            src={bake.image}
+            src={bake.image_url}
             alt={bake.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />

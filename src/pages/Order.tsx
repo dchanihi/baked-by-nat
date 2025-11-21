@@ -37,12 +37,19 @@ const Order = () => {
     fetchBakes();
   }, []);
   const fetchBakes = async () => {
+    const now = new Date().toISOString();
+    
     const {
       data,
       error
-    } = await supabase.from('bakes').select('id, title, image_url').order('date', {
-      ascending: false
-    });
+    } = await supabase
+      .from('bakes')
+      .select('id, title, image_url')
+      .or(`status.eq.published,and(status.eq.scheduled,scheduled_publish_date.lte.${now})`)
+      .order('date', {
+        ascending: false
+      });
+      
     if (error) {
       console.error('Error fetching bakes:', error);
       return;
