@@ -36,6 +36,7 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
     scheduled_publish_date: bake?.scheduled_publish_date 
       ? new Date(bake.scheduled_publish_date).toISOString().slice(0, 16)
       : '',
+    image_position: bake?.image_position || 'center',
   });
 
   useEffect(() => {
@@ -122,6 +123,7 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
       status: formData.status,
       scheduled_publish_date: formData.scheduled_publish_date || null,
       image_url: imageUrl!,
+      image_position: formData.image_position,
       created_by: user?.id,
     };
 
@@ -170,6 +172,24 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
                 onChange={handleImageChange}
                 required={!bake}
               />
+            </div>
+            <div className="mt-4">
+              <Label htmlFor="image-position">Thumbnail Focus Point</Label>
+              <Select
+                value={formData.image_position}
+                onValueChange={(value) => setFormData({ ...formData, image_position: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="center">Center</SelectItem>
+                  <SelectItem value="top">Top</SelectItem>
+                  <SelectItem value="bottom">Bottom</SelectItem>
+                  <SelectItem value="left">Left</SelectItem>
+                  <SelectItem value="right">Right</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

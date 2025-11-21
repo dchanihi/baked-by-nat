@@ -18,6 +18,7 @@ const BakeCard = ({ bake }: BakeCardProps) => {
             src={bake.image_url}
             alt={bake.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            style={{ objectPosition: bake.image_position || 'center' }}
           />
         </div>
         <CardHeader className="space-y-2">
