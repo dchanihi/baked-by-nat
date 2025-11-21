@@ -126,13 +126,12 @@ const Auth = () => {
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div>
-                  <Label htmlFor="signup-name">Display Name</Label>
+                  <Label htmlFor="signup-name">Display Name (Optional)</Label>
                   <Input
                     id="signup-name"
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    required
                   />
                 </div>
                 <div>
