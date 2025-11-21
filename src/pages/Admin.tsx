@@ -10,6 +10,7 @@ import { BakeEditor } from '@/components/admin/BakeEditor';
 import { CategorySettings } from '@/components/admin/CategorySettings';
 import { OrdersList } from '@/components/admin/OrdersList';
 import { OrderDetails } from '@/components/admin/OrderDetails';
+import { OrderOverview } from '@/components/admin/OrderOverview';
 import Navigation from '@/components/Navigation';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -200,8 +201,9 @@ const Admin = () => {
           />
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsList className="grid w-full max-w-2xl grid-cols-3">
               <TabsTrigger value="bakes">manage bakes</TabsTrigger>
+              <TabsTrigger value="overview">order overview</TabsTrigger>
               <TabsTrigger value="orders">view orders</TabsTrigger>
             </TabsList>
 
@@ -217,6 +219,10 @@ const Admin = () => {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
               />
+            </TabsContent>
+
+            <TabsContent value="overview" className="space-y-6">
+              <OrderOverview orders={orders} />
             </TabsContent>
 
             <TabsContent value="orders" className="space-y-6">
