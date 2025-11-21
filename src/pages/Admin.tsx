@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-import { Plus, LogOut, Settings } from 'lucide-react';
+import { Plus, LogOut } from 'lucide-react';
 import { BakesList } from '@/components/admin/BakesList';
 import { BakeEditor } from '@/components/admin/BakeEditor';
 import { CategorySettings } from '@/components/admin/CategorySettings';
@@ -14,12 +14,14 @@ type Bake = Tables<'bakes'>;
 
 const Admin = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [editingBake, setEditingBake] = useState<Bake | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  
+  const showSettings = searchParams.get('view') === 'settings';
 
   useEffect(() => {
     checkAuth();
@@ -146,7 +148,7 @@ const Admin = () => {
               <div className="flex items-center gap-3">
                 <Button 
                   variant="outline" 
-                  onClick={() => setShowSettings(false)}
+                  onClick={() => setSearchParams({})}
                 >
                   Back to Bakes
                 </Button>
@@ -163,14 +165,6 @@ const Admin = () => {
         ) : isCreating ? (
           <>
             <div className="flex items-center justify-end gap-3 mb-6">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowSettings(!showSettings)}
-                size="sm"
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </Button>
               {isAdmin && (
                 <Button variant="outline" onClick={handleSignOut} size="sm">
                   <LogOut className="w-4 h-4 mr-2" />
@@ -191,14 +185,6 @@ const Admin = () => {
                 manage bakes
               </h1>
               <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowSettings(!showSettings)}
-                  size="sm"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Settings
-                </Button>
                 <Button onClick={handleCreateNew} className="bg-pink-soft hover:bg-pink-medium">
                   <Plus className="w-4 h-4 mr-2" />
                   New Bake
