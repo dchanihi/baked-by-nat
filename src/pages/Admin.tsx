@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { Plus } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BakesList } from '@/components/admin/BakesList';
 import { BakeEditor } from '@/components/admin/BakeEditor';
 import { CategorySettings } from '@/components/admin/CategorySettings';
@@ -25,10 +26,9 @@ const Admin = () => {
   const [editingBake, setEditingBake] = useState<Bake | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [activeTab, setActiveTab] = useState('bakes');
   
-  const view = searchParams.get('view') || 'bakes';
-  const showSettings = view === 'settings';
-  const showOrders = view === 'orders';
+  const showSettings = searchParams.get('view') === 'settings';
 
   useEffect(() => {
     checkAuth();
@@ -181,34 +181,17 @@ const Admin = () => {
                 variant="outline" 
                 onClick={() => setSearchParams({})}
               >
-                Back to Bakes
+                back to admin
               </Button>
             </div>
             <CategorySettings />
           </div>
-        ) : showOrders ? (
-          viewingOrder ? (
-            <OrderDetails
-              order={viewingOrder}
-              onBack={handleBackFromOrder}
-              onUpdate={handleOrderUpdate}
-            />
-          ) : (
-            <>
-              <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-display font-bold text-primary-foreground">
-                  manage orders
-                </h1>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSearchParams({})}
-                >
-                  Back to Bakes
-                </Button>
-              </div>
-              <OrdersList orders={orders} onView={handleViewOrder} />
-            </>
-          )
+        ) : viewingOrder ? (
+          <OrderDetails
+            order={viewingOrder}
+            onBack={handleBackFromOrder}
+            onUpdate={handleOrderUpdate}
+          />
         ) : isCreating ? (
           <BakeEditor
             bake={editingBake}
@@ -216,30 +199,30 @@ const Admin = () => {
             onCancel={handleCancel}
           />
         ) : (
-          <>
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-display font-bold text-primary-foreground">
-                manage bakes
-              </h1>
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSearchParams({ view: 'orders' })}
-                >
-                  View Orders
-                </Button>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="bakes">manage bakes</TabsTrigger>
+              <TabsTrigger value="orders">view orders</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="bakes" className="space-y-6">
+              <div className="flex justify-end">
                 <Button onClick={handleCreateNew} className="bg-pink-soft hover:bg-pink-medium">
                   <Plus className="w-4 h-4 mr-2" />
                   New Bake
                 </Button>
               </div>
-            </div>
-            <BakesList
-              bakes={bakes}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          </>
+              <BakesList
+                bakes={bakes}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            </TabsContent>
+
+            <TabsContent value="orders" className="space-y-6">
+              <OrdersList orders={orders} onView={handleViewOrder} />
+            </TabsContent>
+          </Tabs>
         )}
       </main>
     </div>
