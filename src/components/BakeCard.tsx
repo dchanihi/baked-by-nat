@@ -25,13 +25,6 @@ const BakeCard = ({ bake }: BakeCardProps) => {
           <CardTitle className="text-xl font-display font-semibold text-primary-foreground group-hover:text-pink-accent transition-colors">
             {bake.title}
           </CardTitle>
-          <CardDescription className="text-xs text-muted-foreground font-body">
-            {new Date(bake.date).toLocaleDateString('en-US', { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-foreground font-body line-clamp-2">
@@ -39,13 +32,6 @@ const BakeCard = ({ bake }: BakeCardProps) => {
           </p>
         </CardContent>
       </Link>
-      <div className="px-6 pb-6">
-        <Link to={`/order?bakeId=${bake.id}`}>
-          <Button variant="outline" size="sm" className="w-full font-display">
-            order this
-          </Button>
-        </Link>
-      </div>
     </Card>
   );
 };
