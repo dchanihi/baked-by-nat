@@ -190,38 +190,20 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
               <div>
                 <Label htmlFor="image">Image *</Label>
                 <div className="mt-2">
-                  {imagePreview && (
-                    <div className="mb-4 rounded-lg overflow-hidden">
-                      <img src={imagePreview} alt="Preview" className="w-full h-auto" />
-                    </div>
-                  )}
                   <Input
                     id="image"
                     type="file"
                     accept="image/*"
                     onChange={handleImageChange}
                     required={!bake}
+                    className="mb-4"
                   />
+                  {imagePreview && (
+                    <div className="rounded-lg overflow-hidden">
+                      <img src={imagePreview} alt="Preview" className="w-full h-auto" />
+                    </div>
+                  )}
                 </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="image-position">Thumbnail Focus Point</Label>
-                <Select
-                  value={formData.image_position}
-                  onValueChange={(value) => setFormData({ ...formData, image_position: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="center">Center</SelectItem>
-                    <SelectItem value="top">Top</SelectItem>
-                    <SelectItem value="bottom">Bottom</SelectItem>
-                    <SelectItem value="left">Left</SelectItem>
-                    <SelectItem value="right">Right</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
