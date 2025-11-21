@@ -157,6 +157,33 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit}>
+          {/* Action Buttons - Top */}
+          <div className="flex gap-4 mb-8">
+            <Button
+              type="submit"
+              disabled={loading || uploading}
+              className="flex-1"
+            >
+              {loading || uploading ? (
+                'Saving...'
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Bake
+                </>
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={loading || uploading}
+            >
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-8">
             {/* Left Column - Image Section */}
             <div className="space-y-4">
@@ -302,33 +329,6 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
                 />
               </div>
             </div>
-          </div>
-
-          {/* Action Buttons - Full Width Below */}
-          <div className="flex gap-4 mt-8">
-            <Button
-              type="submit"
-              disabled={loading || uploading}
-              className="flex-1"
-            >
-              {loading || uploading ? (
-                'Saving...'
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Bake
-                </>
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={loading || uploading}
-            >
-              <X className="w-4 h-4 mr-2" />
-              Cancel
-            </Button>
           </div>
         </form>
       </CardContent>
