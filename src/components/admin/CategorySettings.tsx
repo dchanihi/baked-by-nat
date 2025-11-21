@@ -7,10 +7,69 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type Category = Tables<'categories'>;
 
+const SortableCategory = ({ category, onDelete }: { category: Category; onDelete: (id: string, name: string) => void }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: category.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 p-3 bg-secondary rounded-lg"
+    >
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+        <GripVertical className="w-4 h-4 text-muted-foreground" />
+      </div>
+      <span className="flex-1 font-medium">{category.name}</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => onDelete(category.id, category.name)}
+        className="text-destructive hover:text-destructive"
+      >
+        <Trash2 className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+};
+
 export const CategorySettings = () => {
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategory, setNewCategory] = useState('');
   const [loading, setLoading] = useState(false);
@@ -92,6 +151,48 @@ export const CategorySettings = () => {
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const oldIndex = categories.findIndex((cat) => cat.id === active.id);
+    const newIndex = categories.findIndex((cat) => cat.id === over.id);
+
+    const newOrder = arrayMove(categories, oldIndex, newIndex);
+    setCategories(newOrder);
+
+    // Update display_order for all affected categories
+    const updates = newOrder.map((cat, index) => ({
+      id: cat.id,
+      display_order: index + 1,
+    }));
+
+    for (const update of updates) {
+      const { error } = await supabase
+        .from('categories')
+        .update({ display_order: update.display_order })
+        .eq('id', update.id);
+
+      if (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to update category order.',
+          variant: 'destructive',
+        });
+        loadCategories(); // Reload to reset on error
+        return;
+      }
+    }
+
+    toast({
+      title: 'Success',
+      description: 'Category order updated.',
+    });
+  };
+
   return (
     <Card className="max-w-2xl mx-auto">
       <CardHeader>
@@ -121,31 +222,33 @@ export const CategorySettings = () => {
 
         <div className="space-y-2">
           <Label>Existing Categories</Label>
-          <div className="space-y-2">
-            {categories.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                No categories yet. Add your first one above!
-              </p>
-            ) : (
-              categories.map((category) => (
-                <div
-                  key={category.id}
-                  className="flex items-center gap-3 p-3 bg-secondary rounded-lg"
+          <p className="text-sm text-muted-foreground">Drag to reorder categories</p>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="space-y-2">
+              {categories.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  No categories yet. Add your first one above!
+                </p>
+              ) : (
+                <SortableContext
+                  items={categories.map((cat) => cat.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <GripVertical className="w-4 h-4 text-muted-foreground" />
-                  <span className="flex-1 font-medium">{category.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(category.id, category.name)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
+                  {categories.map((category) => (
+                    <SortableCategory
+                      key={category.id}
+                      category={category}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </SortableContext>
+              )}
+            </div>
+          </DndContext>
         </div>
       </CardContent>
     </Card>
