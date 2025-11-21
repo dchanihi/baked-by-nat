@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Heart } from 'lucide-react';
+import logo from '@/assets/baked-by-nat-logo.png';
 
 const Navigation = () => {
   const location = useLocation();
@@ -14,7 +14,7 @@ const Navigation = () => {
             to="/" 
             className="flex items-center gap-2 text-xl font-display font-semibold text-primary-foreground hover:text-pink-accent transition-colors"
           >
-            <Heart className="w-5 h-5 fill-pink-soft" />
+            <img src={logo} alt="baked by nat logo" className="w-10 h-10 object-contain" />
             baked by nat
           </Link>
           
