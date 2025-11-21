@@ -82,14 +82,25 @@ const Navigation = () => {
             >
               contact
             </Link>
-            <Link
-              to="/admin"
-              className={`font-body text-sm transition-colors hover:text-pink-accent ${
-                isActive('/admin') ? 'text-pink-accent font-medium' : 'text-foreground'
-              }`}
-            >
-              admin
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                to="/admin"
+                className={`font-body text-sm transition-colors hover:text-pink-accent ${
+                  isActive('/admin') ? 'text-pink-accent font-medium' : 'text-foreground'
+                }`}
+              >
+                admin
+              </Link>
+            ) : (
+              <Link
+                to="/auth"
+                className={`font-body text-sm transition-colors hover:text-pink-accent ${
+                  isActive('/auth') ? 'text-pink-accent font-medium' : 'text-foreground'
+                }`}
+              >
+                sign in
+              </Link>
+            )}
             {isAdminRoute && (
               <>
                 <Link
