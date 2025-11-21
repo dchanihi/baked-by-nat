@@ -2,7 +2,8 @@ import { format } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye } from 'lucide-react';
+import { Eye, Copy } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Order = Tables<'orders'>;
@@ -21,6 +22,22 @@ const statusColors = {
 };
 
 export const OrdersList = ({ orders, onView }: OrdersListProps) => {
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: 'Copied!',
+        description: `${label} copied to clipboard`,
+      });
+    } catch (err) {
+      toast({
+        title: 'Failed to copy',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (orders.length === 0) {
     return (
       <Card className="p-8 text-center">
@@ -48,9 +65,17 @@ export const OrdersList = ({ orders, onView }: OrdersListProps) => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                <div>
+                <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">email:</span>{' '}
                   <span className="font-medium">{order.customer_email}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => copyToClipboard(order.customer_email, 'Email')}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
                 </div>
                 {order.customer_phone && (
                   <div>
