@@ -1,6 +1,5 @@
-import { Instagram, Youtube } from 'lucide-react';
+import { Heart, Instagram, Youtube } from 'lucide-react';
 import { Button } from './ui/button';
-import logo from '@/assets/baked-by-nat-logo.png';
 
 const Footer = () => {
   const scrollToTop = () => {
@@ -12,7 +11,7 @@ const Footer = () => {
       <div className="container mx-auto px-4 py-12">
         <div className="flex flex-col items-center gap-6">
           <div className="flex items-center gap-2 text-xl font-display font-semibold text-primary-foreground">
-            <img src={logo} alt="baked by nat logo" className="w-10 h-10 object-contain" />
+            <Heart className="w-5 h-5 fill-pink-soft" />
             baked by nat
           </div>
           
