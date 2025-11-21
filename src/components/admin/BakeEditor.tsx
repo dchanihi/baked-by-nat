@@ -23,6 +23,7 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
   const [uploading, setUploading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(bake?.image_url || '');
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   
   const [formData, setFormData] = useState({
     title: bake?.title || '',
@@ -36,6 +37,21 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
       ? new Date(bake.scheduled_publish_date).toISOString().slice(0, 16)
       : '',
   });
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    const { data } = await supabase
+      .from('categories')
+      .select('id, name')
+      .order('display_order', { ascending: true });
+    
+    if (data) {
+      setCategories(data);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -190,12 +206,21 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
+              <Select
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="e.g., cookies, cakes"
-              />
+                onValueChange={(value) => setFormData({ ...formData, category: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
