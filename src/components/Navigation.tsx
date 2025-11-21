@@ -93,6 +93,14 @@ const Navigation = () => {
             {isAdminRoute && (
               <>
                 <Link
+                  to="/admin?view=orders"
+                  className={`font-body text-sm transition-colors hover:text-pink-accent ${
+                    location.search === '?view=orders' ? 'text-pink-accent font-medium' : 'text-foreground'
+                  }`}
+                >
+                  orders
+                </Link>
+                <Link
                   to="/admin?view=settings"
                   className={`font-body text-sm transition-colors hover:text-pink-accent flex items-center gap-1 ${
                     location.search === '?view=settings' ? 'text-pink-accent font-medium' : 'text-foreground'
