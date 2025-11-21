@@ -7,10 +7,13 @@ import { Plus } from 'lucide-react';
 import { BakesList } from '@/components/admin/BakesList';
 import { BakeEditor } from '@/components/admin/BakeEditor';
 import { CategorySettings } from '@/components/admin/CategorySettings';
+import { OrdersList } from '@/components/admin/OrdersList';
+import { OrderDetails } from '@/components/admin/OrderDetails';
 import Navigation from '@/components/Navigation';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Bake = Tables<'bakes'>;
+type Order = Tables<'orders'>;
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -18,10 +21,14 @@ const Admin = () => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [bakes, setBakes] = useState<Bake[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [editingBake, setEditingBake] = useState<Bake | null>(null);
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   
-  const showSettings = searchParams.get('view') === 'settings';
+  const view = searchParams.get('view') || 'bakes';
+  const showSettings = view === 'settings';
+  const showOrders = view === 'orders';
 
   useEffect(() => {
     checkAuth();
@@ -55,6 +62,7 @@ const Admin = () => {
 
     setIsAdmin(true);
     loadBakes();
+    loadOrders();
     setLoading(false);
   };
 
@@ -72,6 +80,23 @@ const Admin = () => {
       });
     } else {
       setBakes(data || []);
+    }
+  };
+
+  const loadOrders = async () => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load orders.',
+        variant: 'destructive',
+      });
+    } else {
+      setOrders(data || []);
     }
   };
 
@@ -119,6 +144,18 @@ const Admin = () => {
     setEditingBake(null);
   };
 
+  const handleViewOrder = (order: Order) => {
+    setViewingOrder(order);
+  };
+
+  const handleBackFromOrder = () => {
+    setViewingOrder(null);
+  };
+
+  const handleOrderUpdate = () => {
+    loadOrders();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -149,6 +186,29 @@ const Admin = () => {
             </div>
             <CategorySettings />
           </div>
+        ) : showOrders ? (
+          viewingOrder ? (
+            <OrderDetails
+              order={viewingOrder}
+              onBack={handleBackFromOrder}
+              onUpdate={handleOrderUpdate}
+            />
+          ) : (
+            <>
+              <div className="flex justify-between items-center mb-8">
+                <h1 className="text-3xl font-display font-bold text-primary-foreground">
+                  manage orders
+                </h1>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSearchParams({})}
+                >
+                  Back to Bakes
+                </Button>
+              </div>
+              <OrdersList orders={orders} onView={handleViewOrder} />
+            </>
+          )
         ) : isCreating ? (
           <BakeEditor
             bake={editingBake}
@@ -161,10 +221,18 @@ const Admin = () => {
               <h1 className="text-3xl font-display font-bold text-primary-foreground">
                 manage bakes
               </h1>
-              <Button onClick={handleCreateNew} className="bg-pink-soft hover:bg-pink-medium">
-                <Plus className="w-4 h-4 mr-2" />
-                New Bake
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSearchParams({ view: 'orders' })}
+                >
+                  View Orders
+                </Button>
+                <Button onClick={handleCreateNew} className="bg-pink-soft hover:bg-pink-medium">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Bake
+                </Button>
+              </div>
             </div>
             <BakesList
               bakes={bakes}
