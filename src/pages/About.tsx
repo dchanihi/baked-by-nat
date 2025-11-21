@@ -41,11 +41,7 @@ const About = () => {
                   </h2>
                 </div>
                 <p className="text-base font-body text-foreground leading-relaxed">
-                  baked by nat started in my tiny apartment kitchen, where i spent weekends experimenting with 
-                  recipes and sharing the results with friends. what began as simple chocolate chip cookies has 
-                  grown into a colorful collection of pastries, cakes, and sweet creations. i believe that baking 
-                  should be fun, a little messy, and always delicious. each bake here is made with love, tested 
-                  multiple times (yes, even the "perfect" ones!), and decorated with way too much enthusiasm.
+                  baked by nat is the physical manifestation of my baking passions, born from experimentation and fun and sharing the results with friends. what began as a simple chocolate chip cookie has grown into a colorful collection of pastries, cakes, and sweet creations. i believe that baking should be fun, a little messy, and always delicious.   
                 </p>
               </div>
               
