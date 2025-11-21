@@ -1,0 +1,153 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from '@/hooks/use-toast';
+import { Plus, Trash2, GripVertical } from 'lucide-react';
+import type { Tables } from '@/integrations/supabase/types';
+
+type Category = Tables<'categories'>;
+
+export const CategorySettings = () => {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [newCategory, setNewCategory] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('display_order', { ascending: true });
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load categories.',
+        variant: 'destructive',
+      });
+    } else {
+      setCategories(data || []);
+    }
+  };
+
+  const handleAdd = async () => {
+    if (!newCategory.trim()) return;
+
+    setLoading(true);
+    const maxOrder = categories.length > 0 
+      ? Math.max(...categories.map(c => c.display_order)) 
+      : 0;
+
+    const { error } = await supabase
+      .from('categories')
+      .insert({ 
+        name: newCategory.trim(),
+        display_order: maxOrder + 1
+      });
+
+    setLoading(false);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to add category.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Category added successfully.',
+      });
+      setNewCategory('');
+      loadCategories();
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete category.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Category deleted successfully.',
+      });
+      loadCategories();
+    }
+  };
+
+  return (
+    <Card className="max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle className="font-display">manage categories</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="new-category">Add New Category</Label>
+          <div className="flex gap-2">
+            <Input
+              id="new-category"
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              placeholder="e.g., Macarons"
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            />
+            <Button 
+              onClick={handleAdd}
+              disabled={loading || !newCategory.trim()}
+              className="bg-pink-soft hover:bg-pink-medium"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Existing Categories</Label>
+          <div className="space-y-2">
+            {categories.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No categories yet. Add your first one above!
+              </p>
+            ) : (
+              categories.map((category) => (
+                <div
+                  key={category.id}
+                  className="flex items-center gap-3 p-3 bg-secondary rounded-lg"
+                >
+                  <GripVertical className="w-4 h-4 text-muted-foreground" />
+                  <span className="flex-1 font-medium">{category.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(category.id, category.name)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};

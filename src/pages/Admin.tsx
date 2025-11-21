@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-import { Plus, LogOut } from 'lucide-react';
+import { Plus, LogOut, Settings } from 'lucide-react';
 import { BakesList } from '@/components/admin/BakesList';
 import { BakeEditor } from '@/components/admin/BakeEditor';
+import { CategorySettings } from '@/components/admin/CategorySettings';
 import Navigation from '@/components/Navigation';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -18,6 +19,7 @@ const Admin = () => {
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [editingBake, setEditingBake] = useState<Bake | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -137,6 +139,14 @@ const Admin = () => {
       <div className="bg-background border-b border-border">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-end gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowSettings(!showSettings)}
+              size="sm"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Settings
+            </Button>
             <Button variant="outline" onClick={handleSignOut} size="sm">
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
@@ -146,7 +156,22 @@ const Admin = () => {
       </div>
 
       <main className="container mx-auto px-4 py-8">
-        {isCreating ? (
+        {showSettings ? (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-8">
+              <h1 className="text-3xl font-display font-bold text-primary-foreground">
+                settings
+              </h1>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowSettings(false)}
+              >
+                Back to Bakes
+              </Button>
+            </div>
+            <CategorySettings />
+          </div>
+        ) : isCreating ? (
           <BakeEditor
             bake={editingBake}
             onSave={handleSaveComplete}
