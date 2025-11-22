@@ -10,7 +10,8 @@ const Navigation = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   const isActive = (path: string) => location.pathname === path;
-  const isAdminRoute = location.pathname === '/admin';
+  const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/settings');
+  const isSettingsRoute = location.pathname.startsWith('/admin/settings');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -104,9 +105,9 @@ const Navigation = () => {
             {isAdminRoute && (
               <>
                 <Link
-                  to="/admin?view=settings"
+                  to="/admin/settings/profile"
                   className={`font-body text-sm transition-colors hover:text-pink-accent flex items-center gap-1 ${
-                    location.search === '?view=settings' ? 'text-pink-accent font-medium' : 'text-foreground'
+                    isSettingsRoute ? 'text-pink-accent font-medium' : 'text-foreground'
                   }`}
                 >
                   <Settings className="w-4 h-4" />

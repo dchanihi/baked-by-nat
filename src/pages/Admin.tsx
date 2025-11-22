@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
@@ -7,8 +7,6 @@ import { Plus } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BakesList } from '@/components/admin/BakesList';
 import { BakeEditor } from '@/components/admin/BakeEditor';
-import { CategorySettings } from '@/components/admin/CategorySettings';
-import { AccountSettings } from '@/components/admin/AccountSettings';
 import { OrdersList } from '@/components/admin/OrdersList';
 import { OrderDetails } from '@/components/admin/OrderDetails';
 import { OrderOverview } from '@/components/admin/OrderOverview';
@@ -20,7 +18,6 @@ type Order = Tables<'orders'>;
 
 const Admin = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [bakes, setBakes] = useState<Bake[]>([]);
@@ -29,8 +26,6 @@ const Admin = () => {
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  
-  const showSettings = searchParams.get('view') === 'settings';
 
   useEffect(() => {
     checkAuth();
@@ -173,25 +168,7 @@ const Admin = () => {
       <Navigation />
 
       <main className="container mx-auto px-4 py-8">
-        {showSettings ? (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between mb-8">
-              <h1 className="text-3xl font-display font-bold text-primary-foreground">
-                settings
-              </h1>
-              <Button 
-                variant="outline" 
-                onClick={() => setSearchParams({})}
-              >
-                back to admin
-              </Button>
-            </div>
-            <div className="space-y-8">
-              <AccountSettings />
-              <CategorySettings />
-            </div>
-          </div>
-        ) : viewingOrder ? (
+        {viewingOrder ? (
           <OrderDetails
             order={viewingOrder}
             onBack={handleBackFromOrder}
