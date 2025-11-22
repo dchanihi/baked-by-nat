@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Eye, Copy } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Order = Tables<'orders'>;
@@ -47,91 +48,94 @@ export const OrdersList = ({ orders, onView }: OrdersListProps) => {
   }
 
   return (
-    <div className="grid gap-4">
-      {orders.map((order) => (
-        <Card key={order.id} className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 space-y-3">
-              <div className="flex items-center gap-3">
-                <h3 className="font-display font-semibold text-lg">
-                  {order.customer_name}
-                </h3>
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Customer</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Details</TableHead>
+            <TableHead>Date Info</TableHead>
+            <TableHead>Submitted</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {orders.map((order) => (
+            <TableRow key={order.id}>
+              <TableCell className="font-medium">
+                <div className="space-y-1">
+                  <div className="font-display">{order.customer_name}</div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>{order.customer_email}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-4 w-4"
+                      onClick={() => copyToClipboard(order.customer_email, 'Email')}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  {order.customer_phone && (
+                    <div className="text-xs text-muted-foreground">{order.customer_phone}</div>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>
                 <Badge className={statusColors[order.status]}>
                   {order.status}
                 </Badge>
+              </TableCell>
+              <TableCell>
                 <Badge variant="outline">
                   {order.order_type === 'existing_bake' ? 'pre-made' : 'custom'}
                 </Badge>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">email:</span>{' '}
-                  <span className="font-medium">{order.customer_email}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => copyToClipboard(order.customer_email, 'Email')}
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-                {order.customer_phone && (
-                  <div>
-                    <span className="text-muted-foreground">phone:</span>{' '}
-                    <span className="font-medium">{order.customer_phone}</span>
+              </TableCell>
+              <TableCell>
+                {order.order_type === 'existing_bake' && order.bake_title ? (
+                  <div className="text-sm">
+                    <div className="font-medium">{order.bake_title}</div>
+                    <div className="text-muted-foreground">Qty: {order.quantity}</div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground max-w-xs truncate">
+                    {order.custom_description || 'Custom order'}
                   </div>
                 )}
-                {order.requested_date && (
-                  <div>
-                    <span className="text-muted-foreground">requested date:</span>{' '}
-                    <span className="font-medium">
-                      {format(new Date(order.requested_date), 'MMM d, yyyy')}
-                    </span>
-                  </div>
-                )}
-                {order.pickup_date && (
-                  <div>
-                    <span className="text-muted-foreground">pickup date:</span>{' '}
-                    <span className="font-medium">
-                      {format(new Date(order.pickup_date), 'MMM d, yyyy')}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {order.order_type === 'existing_bake' && order.bake_title && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">bake:</span>{' '}
-                  <span className="font-medium">{order.bake_title}</span>
-                  {' '}× {order.quantity}
+              </TableCell>
+              <TableCell>
+                <div className="text-sm space-y-1">
+                  {order.requested_date && (
+                    <div className="text-muted-foreground">
+                      Need: {format(new Date(order.requested_date), 'MMM d')}
+                    </div>
+                  )}
+                  {order.pickup_date && (
+                    <div className="text-muted-foreground">
+                      Pickup: {format(new Date(order.pickup_date), 'MMM d')}
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {order.order_type === 'custom' && order.custom_description && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">custom order:</span>{' '}
-                  <p className="mt-1">{order.custom_description}</p>
-                </div>
-              )}
-
-              <div className="text-xs text-muted-foreground">
-                submitted {format(new Date(order.created_at), 'MMM d, yyyy h:mm a')}
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onView(order)}
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              View
-            </Button>
-          </div>
-        </Card>
-      ))}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {format(new Date(order.created_at), 'MMM d, yyyy')}
+              </TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onView(order)}
+                >
+                  <Eye className="w-4 h-4 mr-1" />
+                  View
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 };
