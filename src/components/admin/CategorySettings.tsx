@@ -8,6 +8,21 @@ import { toast } from '@/hooks/use-toast';
 import { Plus, Trash2, GripVertical, Pencil, Check, X } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -134,6 +149,9 @@ export const CategorySettings = () => {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [replacementCategoryId, setReplacementCategoryId] = useState<string>('');
 
   useEffect(() => {
     loadCategories();
@@ -190,12 +208,36 @@ export const CategorySettings = () => {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+    setCategoryToDelete({ id, name });
+    setReplacementCategoryId('');
+    setDeleteDialogOpen(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!categoryToDelete) return;
+
+    // Update all bakes with this category to the replacement category
+    if (replacementCategoryId) {
+      const { error: updateError } = await supabase
+        .from('bakes')
+        .update({ category: categories.find(c => c.id === replacementCategoryId)?.name })
+        .eq('category', categoryToDelete.name);
+
+      if (updateError) {
+        toast({
+          title: 'Error',
+          description: 'Failed to update bakes with new category.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    // Delete the category
     const { error } = await supabase
       .from('categories')
       .delete()
-      .eq('id', id);
+      .eq('id', categoryToDelete.id);
 
     if (error) {
       toast({
@@ -206,8 +248,11 @@ export const CategorySettings = () => {
     } else {
       toast({
         title: 'Success',
-        description: 'Category deleted successfully.',
+        description: 'Category deleted and bakes updated successfully.',
       });
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+      setReplacementCategoryId('');
       loadCategories();
     }
   };
@@ -289,12 +334,17 @@ export const CategorySettings = () => {
     });
   };
 
+  const availableReplacementCategories = categories.filter(
+    cat => cat.id !== categoryToDelete?.id
+  );
+
   return (
-    <Card className="max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle className="font-display">manage categories</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <>
+      <Card className="max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle className="font-display">manage categories</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="new-category">Add New Category</Label>
           <div className="flex gap-2">
@@ -354,5 +404,60 @@ export const CategorySettings = () => {
         </div>
       </CardContent>
     </Card>
+
+    <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete Category</DialogTitle>
+          <DialogDescription>
+            You are about to delete "{categoryToDelete?.name}". 
+            {availableReplacementCategories.length > 0 ? (
+              <> Please select a category to reassign all bakes currently using this category.</>
+            ) : (
+              <> There are no other categories available. All bakes using this category will have their category cleared.</>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        
+        {availableReplacementCategories.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="replacement-category">Replacement Category</Label>
+            <Select value={replacementCategoryId} onValueChange={setReplacementCategoryId}>
+              <SelectTrigger id="replacement-category">
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableReplacementCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setDeleteDialogOpen(false);
+              setCategoryToDelete(null);
+              setReplacementCategoryId('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleConfirmDelete}
+            disabled={availableReplacementCategories.length > 0 && !replacementCategoryId}
+          >
+            Confirm Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
