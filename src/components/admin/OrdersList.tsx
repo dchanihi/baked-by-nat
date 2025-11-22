@@ -48,7 +48,7 @@ export const OrdersList = ({ orders, onView }: OrdersListProps) => {
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
