@@ -1,9 +1,8 @@
-import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import Bakes from "./pages/Bakes";
 import BakeDetail from "./pages/BakeDetail";
@@ -12,6 +11,7 @@ import Contact from "./pages/Contact";
 import Order from "./pages/Order";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +31,9 @@ const App = () => (
           <Route path="/order" element={<Order />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/settings" element={<Navigate to="/admin/settings/profile" replace />} />
+          <Route path="/admin/settings/profile" element={<Settings />} />
+          <Route path="/admin/settings/categories" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
