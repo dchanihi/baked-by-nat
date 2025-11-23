@@ -257,6 +257,48 @@ export const CategorySettings = () => {
     }
   };
 
+  const handleDeleteWithoutReassignment = async () => {
+    if (!categoryToDelete) return;
+
+    // Clear category from all bakes using this category
+    const { error: updateError } = await supabase
+      .from('bakes')
+      .update({ category: null })
+      .eq('category', categoryToDelete.name);
+
+    if (updateError) {
+      toast({
+        title: 'Error',
+        description: 'Failed to clear category from bakes.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Delete the category
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', categoryToDelete.id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete category.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Category deleted and bakes cleared successfully.',
+      });
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+      setReplacementCategoryId('');
+      loadCategories();
+    }
+  };
+
   const handleEdit = (id: string, name: string) => {
     setEditingId(id);
     setEditValue(name);
@@ -437,7 +479,7 @@ export const CategorySettings = () => {
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -449,11 +491,18 @@ export const CategorySettings = () => {
             Cancel
           </Button>
           <Button
+            variant="outline"
+            onClick={handleDeleteWithoutReassignment}
+            className="text-destructive hover:text-destructive"
+          >
+            Delete Without Reassignment
+          </Button>
+          <Button
             variant="destructive"
             onClick={handleConfirmDelete}
             disabled={availableReplacementCategories.length > 0 && !replacementCategoryId}
           >
-            Confirm Delete
+            Confirm & Reassign
           </Button>
         </DialogFooter>
       </DialogContent>
