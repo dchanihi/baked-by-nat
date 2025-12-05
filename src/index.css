@@ -8,106 +8,105 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Lilac purple color palette */
-    --background: 270 40% 97%;
-    --foreground: 270 30% 20%;
+    /* Petal Frost color palette - soft pinks with blue-slate accents */
+    --background: 315 50% 97%;
+    --foreground: 214 13% 25%;
 
     --card: 0 0% 100%;
-    --card-foreground: 270 30% 20%;
+    --card-foreground: 214 13% 25%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 270 30% 20%;
+    --popover-foreground: 214 13% 25%;
 
-    --primary: 280 60% 75%;
-    --primary-foreground: 280 70% 20%;
+    --primary: 315 61% 90%;
+    --primary-foreground: 214 13% 25%;
 
-    --secondary: 270 30% 93%;
-    --secondary-foreground: 270 30% 20%;
+    --secondary: 160 60% 94%;
+    --secondary-foreground: 214 13% 25%;
 
-    --muted: 270 25% 90%;
-    --muted-foreground: 270 20% 45%;
+    --muted: 209 20% 92%;
+    --muted-foreground: 214 13% 45%;
 
-    --accent: 285 50% 80%;
-    --accent-foreground: 280 60% 25%;
+    --accent: 351 63% 81%;
+    --accent-foreground: 214 13% 20%;
 
     --destructive: 0 70% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 270 25% 88%;
-    --input: 270 25% 92%;
-    --ring: 280 60% 75%;
+    --border: 315 30% 90%;
+    --input: 315 30% 93%;
+    --ring: 351 63% 81%;
 
     --radius: 1rem;
     
-    /* Custom lilac purple tokens */
-    --pink-soft: 280 60% 80%;
-    --pink-medium: 280 55% 70%;
-    --pink-accent: 285 60% 65%;
-    --cream: 270 30% 93%;
-    --cookie: 280 40% 75%;
-    --warm-white: 270 40% 97%;
+    /* Custom Petal Frost tokens */
+    --pink-soft: 315 61% 90%;
+    --pink-medium: 351 63% 81%;
+    --pink-accent: 351 50% 75%;
+    --cream: 160 60% 94%;
+    --cookie: 209 27% 59%;
+    --warm-white: 315 50% 97%;
+    --frozen-water: 160 85% 92%;
+    --steel-blue: 209 27% 59%;
+    --blue-slate: 214 13% 45%;
 
     --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-foreground: 214 13% 26%;
+    --sidebar-primary: 351 63% 81%;
+    --sidebar-primary-foreground: 214 13% 20%;
+    --sidebar-accent: 315 40% 95%;
+    --sidebar-accent-foreground: 214 13% 20%;
+    --sidebar-border: 315 30% 90%;
+    --sidebar-ring: 351 63% 81%;
   }
 
   .dark {
-    --background: 270 25% 12%;
-    --foreground: 270 30% 95%;
+    --background: 214 20% 12%;
+    --foreground: 315 40% 95%;
 
-    --card: 270 30% 15%;
-    --card-foreground: 270 30% 95%;
+    --card: 214 18% 15%;
+    --card-foreground: 315 40% 95%;
 
-    --popover: 270 30% 15%;
-    --popover-foreground: 270 30% 95%;
+    --popover: 214 18% 15%;
+    --popover-foreground: 315 40% 95%;
 
-    --primary: 280 60% 70%;
-    --primary-foreground: 270 25% 12%;
+    --primary: 315 50% 80%;
+    --primary-foreground: 214 20% 12%;
 
-    --secondary: 270 25% 20%;
-    --secondary-foreground: 270 30% 95%;
+    --secondary: 160 40% 25%;
+    --secondary-foreground: 160 60% 90%;
 
-    --muted: 270 25% 18%;
-    --muted-foreground: 270 20% 60%;
+    --muted: 214 15% 20%;
+    --muted-foreground: 209 20% 60%;
 
-    --accent: 285 50% 60%;
-    --accent-foreground: 270 30% 95%;
+    --accent: 351 50% 65%;
+    --accent-foreground: 315 40% 95%;
 
     --destructive: 0 70% 55%;
-    --destructive-foreground: 270 30% 95%;
+    --destructive-foreground: 315 40% 95%;
 
-    --border: 270 25% 22%;
-    --input: 270 25% 22%;
-    --ring: 280 60% 70%;
+    --border: 214 15% 22%;
+    --input: 214 15% 22%;
+    --ring: 351 50% 65%;
     
-    --pink-soft: 280 60% 70%;
-    --pink-medium: 280 55% 60%;
-    --pink-accent: 285 50% 55%;
-    --cream: 270 25% 20%;
-    --cookie: 280 40% 60%;
-    --warm-white: 270 25% 12%;
+    --pink-soft: 315 50% 80%;
+    --pink-medium: 351 50% 70%;
+    --pink-accent: 351 45% 60%;
+    --cream: 160 30% 22%;
+    --cookie: 209 25% 50%;
+    --warm-white: 214 20% 12%;
+    --frozen-water: 160 50% 30%;
+    --steel-blue: 209 25% 50%;
+    --blue-slate: 214 13% 55%;
     
-    --sidebar-background: 30 25% 15%;
-    --sidebar-foreground: 30 40% 95%;
-    --sidebar-primary: 340 70% 70%;
-    --sidebar-primary-foreground: 30 20% 12%;
-    --sidebar-accent: 30 25% 18%;
-    --sidebar-accent-foreground: 30 40% 95%;
-    --sidebar-border: 30 25% 22%;
-    --sidebar-ring: 340 70% 70%;
+    --sidebar-background: 214 18% 15%;
+    --sidebar-foreground: 315 40% 95%;
+    --sidebar-primary: 351 50% 70%;
+    --sidebar-primary-foreground: 214 18% 12%;
+    --sidebar-accent: 214 15% 20%;
+    --sidebar-accent-foreground: 315 40% 95%;
+    --sidebar-border: 214 15% 22%;
+    --sidebar-ring: 351 50% 70%;
   }
 }
 
