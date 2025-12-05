@@ -24,7 +24,6 @@ export default {
         'cream': 'hsl(var(--cream))',
         'cookie': 'hsl(var(--cookie))',
         'warm-white': 'hsl(var(--warm-white))',
-        'frozen-water': 'hsl(var(--frozen-water))',
         'steel-blue': 'hsl(var(--steel-blue))',
         'blue-slate': 'hsl(var(--blue-slate))',
         border: "hsl(var(--border))",

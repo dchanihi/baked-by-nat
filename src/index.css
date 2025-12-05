@@ -21,7 +21,7 @@ All colors MUST be HSL.
     --primary: 315 61% 90%;
     --primary-foreground: 214 13% 25%;
 
-    --secondary: 160 60% 94%;
+    --secondary: 209 27% 85%;
     --secondary-foreground: 214 13% 25%;
 
     --muted: 209 20% 92%;
@@ -43,10 +43,9 @@ All colors MUST be HSL.
     --pink-soft: 315 61% 90%;
     --pink-medium: 351 63% 81%;
     --pink-accent: 351 50% 75%;
-    --cream: 160 60% 94%;
+    --cream: 209 27% 90%;
     --cookie: 209 27% 59%;
     --warm-white: 315 50% 97%;
-    --frozen-water: 160 85% 92%;
     --steel-blue: 209 27% 59%;
     --blue-slate: 214 13% 45%;
 
@@ -73,8 +72,8 @@ All colors MUST be HSL.
     --primary: 315 50% 80%;
     --primary-foreground: 214 20% 12%;
 
-    --secondary: 160 40% 25%;
-    --secondary-foreground: 160 60% 90%;
+    --secondary: 209 25% 25%;
+    --secondary-foreground: 209 30% 90%;
 
     --muted: 214 15% 20%;
     --muted-foreground: 209 20% 60%;
@@ -92,10 +91,9 @@ All colors MUST be HSL.
     --pink-soft: 315 50% 80%;
     --pink-medium: 351 50% 70%;
     --pink-accent: 351 45% 60%;
-    --cream: 160 30% 22%;
+    --cream: 209 25% 25%;
     --cookie: 209 25% 50%;
     --warm-white: 214 20% 12%;
-    --frozen-water: 160 50% 30%;
     --steel-blue: 209 25% 50%;
     --blue-slate: 214 13% 55%;
     
