@@ -8,41 +8,33 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import heroImage from '@/assets/hero-baking.jpg';
 import { Sparkles } from 'lucide-react';
-
 type Bake = Tables<'bakes'>;
-
 const Index = () => {
   const [latestBakes, setLatestBakes] = useState<Bake[]>([]);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     loadBakes();
   }, []);
-
   const loadBakes = async () => {
     const now = new Date().toISOString();
-    
-    // First, update any scheduled posts whose date has passed
-    await supabase
-      .from('bakes')
-      .update({ status: 'published' })
-      .eq('status', 'scheduled')
-      .lte('scheduled_publish_date', now);
-    
-    // Then fetch published bakes (excluding archived)
-    const { data, error } = await supabase
-      .from('bakes')
-      .select('*')
-      .eq('status', 'published')
-      .order('date', { ascending: false })
-      .limit(6);
 
+    // First, update any scheduled posts whose date has passed
+    await supabase.from('bakes').update({
+      status: 'published'
+    }).eq('status', 'scheduled').lte('scheduled_publish_date', now);
+
+    // Then fetch published bakes (excluding archived)
+    const {
+      data,
+      error
+    } = await supabase.from('bakes').select('*').eq('status', 'published').order('date', {
+      ascending: false
+    }).limit(6);
     if (!error && data) {
       setLatestBakes(data);
     }
     setLoading(false);
   };
-
   const scrollToBakes = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     const bakesSection = document.getElementById('latest-bakes');
@@ -64,9 +56,7 @@ const Index = () => {
               <h2 className="text-xl md:text-2xl font-body text-pink-accent">
                 a baker proud to call edmonton her home              
               </h2>
-              <p className="text-base md:text-lg font-body text-foreground leading-relaxed">
-                i'm a home baker who loves creating cute, cozy desserts that make people smile! let me share with you my latest bakes and sweet inspiration. whether it's fluffy cupcakes, buttery cookies, or dreamy cakes, everything is baked with love ♡
-              </p>
+              <p className="text-base md:text-lg font-body text-foreground leading-relaxed">i'm a home baker who loves creating cute, and cozy desserts that make people smile! let me share with you my latest bakes and sweet inspiration. whether it's fluffy cupcakes, buttery cookies, or dreamy cakes, everything is baked with love ♡</p>
               <Button onClick={scrollToBakes} className="bg-pink-soft hover:bg-pink-medium text-primary-foreground font-body font-medium px-8 py-6 text-base rounded-full shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300">
                 <Sparkles className="w-5 h-5 mr-2" />
                 see my latest bakes
@@ -94,17 +84,11 @@ const Index = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-              {loading ? (
-                <div className="col-span-full text-center py-12">
+              {loading ? <div className="col-span-full text-center py-12">
                   <p className="text-muted-foreground">loading bakes...</p>
-                </div>
-              ) : latestBakes.length === 0 ? (
-                <div className="col-span-full text-center py-12">
+                </div> : latestBakes.length === 0 ? <div className="col-span-full text-center py-12">
                   <p className="text-muted-foreground">no bakes yet ♡</p>
-                </div>
-              ) : (
-                latestBakes.map(bake => <BakeCard key={bake.id} bake={bake} />)
-              )}
+                </div> : latestBakes.map(bake => <BakeCard key={bake.id} bake={bake} />)}
             </div>
             
             <div className="text-center">
