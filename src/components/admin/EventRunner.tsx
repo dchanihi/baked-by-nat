@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   Dialog,
@@ -31,6 +31,9 @@ interface Event {
   start_time: string;
   end_time: string | null;
   status: 'draft' | 'active' | 'completed';
+  current_day?: number;
+  day_open_time?: string | null;
+  day_close_time?: string | null;
 }
 
 interface EventRunnerProps {
@@ -45,19 +48,32 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
   const [manualSaleItem, setManualSaleItem] = useState<EventItem | null>(null);
   const [manualQuantity, setManualQuantity] = useState(1);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [showStartConfirm, setShowStartConfirm] = useState(false);
+  const [showEndDayDialog, setShowEndDayDialog] = useState(false);
+  const [currentEvent, setCurrentEvent] = useState<Event>(event);
+
+  // Determine if we need to show the start confirmation
+  const isDayActive = currentEvent.day_open_time && !currentEvent.day_close_time;
+  const currentDay = currentEvent.current_day || 0;
 
   useEffect(() => {
     loadItems();
-    activateEventIfNeeded();
+    loadEventDetails();
   }, [event.id]);
 
-  const activateEventIfNeeded = async () => {
-    if (event.status === 'draft') {
-      await supabase
-        .from('events')
-        .update({ status: 'active' })
-        .eq('id', event.id);
-      onUpdate();
+  const loadEventDetails = async () => {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', event.id)
+      .maybeSingle();
+
+    if (data) {
+      setCurrentEvent(data as Event);
+      // Show start confirmation if day isn't active
+      if (!data.day_open_time || data.day_close_time) {
+        setShowStartConfirm(true);
+      }
     }
   };
 
@@ -86,6 +102,78 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
     setLoading(false);
   };
 
+  const startDay = async () => {
+    const newDay = (currentEvent.current_day || 0) + 1;
+    const openTime = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('events')
+      .update({
+        status: 'active',
+        current_day: newDay,
+        day_open_time: openTime,
+        day_close_time: null,
+      })
+      .eq('id', event.id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to start the day.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCurrentEvent({
+      ...currentEvent,
+      status: 'active',
+      current_day: newDay,
+      day_open_time: openTime,
+      day_close_time: null,
+    });
+    setShowStartConfirm(false);
+    onUpdate();
+
+    toast({
+      title: `Day ${newDay} Started`,
+      description: `Event opened at ${format(new Date(openTime), 'h:mm a')}`,
+    });
+  };
+
+  const endDay = async () => {
+    const closeTime = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('events')
+      .update({
+        day_close_time: closeTime,
+      })
+      .eq('id', event.id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to end the day.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCurrentEvent({
+      ...currentEvent,
+      day_close_time: closeTime,
+    });
+    setShowEndDayDialog(false);
+    setShowStartConfirm(true);
+    onUpdate();
+
+    toast({
+      title: `Day ${currentDay} Ended`,
+      description: `Event closed at ${format(new Date(closeTime), 'h:mm a')}`,
+    });
+  };
+
   const recordSale = async (itemId: string, quantity: number) => {
     const item = items.find(i => i.id === itemId);
     if (!item) return;
@@ -102,12 +190,10 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
 
     const newQuantitySold = item.quantity_sold + quantity;
 
-    // Update local state immediately
     setItems(items.map(i =>
       i.id === itemId ? { ...i, quantity_sold: newQuantitySold } : i
     ));
 
-    // Update database
     const { error: updateError } = await supabase
       .from('event_items')
       .update({ quantity_sold: newQuantitySold })
@@ -119,11 +205,10 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
         description: 'Failed to update inventory.',
         variant: 'destructive',
       });
-      loadItems(); // Reload to get correct state
+      loadItems();
       return;
     }
 
-    // Record the sale
     await supabase.from('event_sales').insert({
       event_item_id: itemId,
       quantity,
@@ -151,14 +236,13 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
       .update({ quantity_sold: newQuantitySold })
       .eq('id', itemId);
 
-    // Delete the most recent sale for this item
     const { data: recentSale } = await supabase
       .from('event_sales')
       .select('id')
       .eq('event_item_id', itemId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (recentSale) {
       await supabase.from('event_sales').delete().eq('id', recentSale.id);
@@ -173,9 +257,14 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
   };
 
   const completeEvent = async () => {
+    const closeTime = new Date().toISOString();
+
     await supabase
       .from('events')
-      .update({ status: 'completed' })
+      .update({
+        status: 'completed',
+        day_close_time: closeTime,
+      })
       .eq('id', event.id);
     
     toast({
@@ -202,6 +291,80 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
     );
   }
 
+  // Start Confirmation Screen
+  if (showStartConfirm) {
+    const isFirstDay = currentDay === 0;
+    const dayNumber = currentDay + 1;
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+        </div>
+
+        <div className="max-w-md mx-auto">
+          <div className="bg-card rounded-xl border p-8 text-center space-y-6">
+            <div className="w-16 h-16 mx-auto rounded-full bg-pink-soft/20 flex items-center justify-center">
+              <Play className="w-8 h-8 text-pink-soft" />
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-semibold text-foreground">{event.name}</h2>
+              <p className="text-muted-foreground mt-1">
+                {format(new Date(event.start_time), 'EEEE, MMMM d, yyyy')}
+                {event.location && ` • ${event.location}`}
+              </p>
+            </div>
+
+            <div className="bg-secondary rounded-lg p-4 space-y-2 text-left">
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="font-medium">Day {dayNumber}</span>
+                {!isFirstDay && (
+                  <span className="text-muted-foreground">(Multi-day event)</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="w-4 h-4" />
+                <span>Opening time will be recorded when you start</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Package className="w-4 h-4" />
+                <span>{items.length} items ready • {totalInventory} total inventory</span>
+              </div>
+            </div>
+
+            {!isFirstDay && currentEvent.day_close_time && (
+              <div className="bg-muted rounded-lg p-3 text-sm text-muted-foreground">
+                <p>Day {currentDay} ended at {format(new Date(currentEvent.day_close_time), 'h:mm a')}</p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <Button
+                onClick={startDay}
+                className="w-full bg-pink-soft hover:bg-pink-medium text-white py-6 text-lg"
+              >
+                <Play className="w-5 h-5 mr-2" />
+                {isFirstDay ? 'Start Event' : `Start Day ${dayNumber}`}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onBack}
+                className="w-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -211,21 +374,37 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
             Back
           </Button>
           <div>
-            <h2 className="text-2xl font-semibold text-foreground">{event.name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-semibold text-foreground">{event.name}</h2>
+              <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                Day {currentDay}
+              </span>
+            </div>
             <p className="text-sm text-muted-foreground">
-              {format(new Date(event.start_time), 'EEEE, MMMM d, yyyy • h:mm a')}
-              {event.location && ` • ${event.location}`}
+              {currentEvent.day_open_time && (
+                <>Opened at {format(new Date(currentEvent.day_open_time), 'h:mm a')} • </>
+              )}
+              {event.location && `${event.location}`}
             </p>
           </div>
         </div>
-        <Button
-          onClick={() => setShowCompleteDialog(true)}
-          variant="outline"
-          className="text-green-600 hover:text-green-700"
-        >
-          <CheckCircle className="w-4 h-4 mr-2" />
-          Complete Event
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowEndDayDialog(true)}
+            variant="outline"
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            End Day {currentDay}
+          </Button>
+          <Button
+            onClick={() => setShowCompleteDialog(true)}
+            variant="outline"
+            className="text-green-600 hover:text-green-700"
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Complete Event
+          </Button>
+        </div>
       </div>
 
       {/* Metrics Cards */}
@@ -367,6 +546,34 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
         </DialogContent>
       </Dialog>
 
+      {/* End Day Dialog */}
+      <Dialog open={showEndDayDialog} onOpenChange={setShowEndDayDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>End Day {currentDay}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p>Are you sure you want to end Day {currentDay}? You can start a new day afterwards for multi-day events.</p>
+            <div className="bg-secondary rounded-lg p-4 space-y-2">
+              {currentEvent.day_open_time && (
+                <p><strong>Opened at:</strong> {format(new Date(currentEvent.day_open_time), 'h:mm a')}</p>
+              )}
+              <p><strong>Closing at:</strong> {format(new Date(), 'h:mm a')}</p>
+              <p><strong>Today's Revenue:</strong> ${totalRevenue.toFixed(2)}</p>
+              <p><strong>Items Sold:</strong> {totalItemsSold}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEndDayDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={endDay} className="bg-pink-soft hover:bg-pink-medium">
+              End Day {currentDay}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Complete Event Dialog */}
       <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
         <DialogContent>
@@ -374,8 +581,9 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
             <DialogTitle>Complete Event</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p>Are you sure you want to mark this event as completed?</p>
+            <p>Are you sure you want to mark this event as completed? This will end the event permanently.</p>
             <div className="bg-secondary rounded-lg p-4 space-y-2">
+              <p><strong>Total Days:</strong> {currentDay}</p>
               <p><strong>Final Revenue:</strong> ${totalRevenue.toFixed(2)}</p>
               <p><strong>Total COGS:</strong> ${totalCOGS.toFixed(2)}</p>
               <p><strong>Net Profit:</strong> ${totalProfit.toFixed(2)}</p>
