@@ -10,11 +10,26 @@ import { BakeEditor } from '@/components/admin/BakeEditor';
 import { OrdersList } from '@/components/admin/OrdersList';
 import { OrderDetails } from '@/components/admin/OrderDetails';
 import { OrderOverview } from '@/components/admin/OrderOverview';
+import { EventsList } from '@/components/admin/EventsList';
+import { EventEditor } from '@/components/admin/EventEditor';
+import { EventRunner } from '@/components/admin/EventRunner';
 import Navigation from '@/components/Navigation';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Bake = Tables<'bakes'>;
 type Order = Tables<'orders'>;
+
+interface Event {
+  id: string;
+  name: string;
+  description: string | null;
+  location: string | null;
+  start_time: string;
+  end_time: string | null;
+  status: 'draft' | 'active' | 'completed';
+  notes: string | null;
+  created_at: string;
+}
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -22,9 +37,13 @@ const Admin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [editingBake, setEditingBake] = useState<Bake | null>(null);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [runningEvent, setRunningEvent] = useState<Event | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
@@ -60,6 +79,7 @@ const Admin = () => {
     setIsAdmin(true);
     loadBakes();
     loadOrders();
+    loadEvents();
     setLoading(false);
   };
 
@@ -94,6 +114,23 @@ const Admin = () => {
       });
     } else {
       setOrders(data || []);
+    }
+  };
+
+  const loadEvents = async () => {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('start_time', { ascending: false });
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load events.',
+        variant: 'destructive',
+      });
+    } else {
+      setEvents((data || []) as Event[]);
     }
   };
 
@@ -153,6 +190,64 @@ const Admin = () => {
     loadOrders();
   };
 
+  // Event handlers
+  const handleCreateEvent = () => {
+    setEditingEvent(null);
+    setIsCreatingEvent(true);
+  };
+
+  const handleEditEvent = (event: Event) => {
+    setEditingEvent(event);
+    setIsCreatingEvent(true);
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this event?')) return;
+
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete event.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Event deleted successfully.',
+      });
+      loadEvents();
+    }
+  };
+
+  const handleRunEvent = (event: Event) => {
+    setRunningEvent(event);
+  };
+
+  const handleEventSaveComplete = () => {
+    setIsCreatingEvent(false);
+    setEditingEvent(null);
+    loadEvents();
+  };
+
+  const handleEventCancel = () => {
+    setIsCreatingEvent(false);
+    setEditingEvent(null);
+  };
+
+  const handleBackFromEvent = () => {
+    setRunningEvent(null);
+    loadEvents();
+  };
+
+  const handleEventUpdate = () => {
+    loadEvents();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -174,6 +269,18 @@ const Admin = () => {
             onBack={handleBackFromOrder}
             onUpdate={handleOrderUpdate}
           />
+        ) : runningEvent ? (
+          <EventRunner
+            event={runningEvent}
+            onBack={handleBackFromEvent}
+            onUpdate={handleEventUpdate}
+          />
+        ) : isCreatingEvent ? (
+          <EventEditor
+            event={editingEvent}
+            onSave={handleEventSaveComplete}
+            onCancel={handleEventCancel}
+          />
         ) : isCreating ? (
           <BakeEditor
             bake={editingBake}
@@ -182,10 +289,11 @@ const Admin = () => {
           />
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full max-w-2xl grid-cols-3">
+            <TabsList className="grid w-full max-w-3xl grid-cols-4">
               <TabsTrigger value="overview">order overview</TabsTrigger>
               <TabsTrigger value="orders">view orders</TabsTrigger>
               <TabsTrigger value="bakes">manage bakes</TabsTrigger>
+              <TabsTrigger value="events">events</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
@@ -207,6 +315,16 @@ const Admin = () => {
                 bakes={bakes}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+              />
+            </TabsContent>
+
+            <TabsContent value="events" className="space-y-6">
+              <EventsList
+                events={events}
+                onEdit={handleEditEvent}
+                onDelete={handleDeleteEvent}
+                onRun={handleRunEvent}
+                onCreate={handleCreateEvent}
               />
             </TabsContent>
           </Tabs>

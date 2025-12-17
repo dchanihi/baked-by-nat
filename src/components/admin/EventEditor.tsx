@@ -1,0 +1,421 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/components/ui/use-toast';
+import { ArrowLeft, Plus, Trash2, Link } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import type { Tables } from '@/integrations/supabase/types';
+
+type Bake = Tables<'bakes'>;
+
+interface EventItem {
+  id?: string;
+  bake_id: string | null;
+  name: string;
+  cogs: number;
+  price: number;
+  starting_quantity: number;
+}
+
+interface Event {
+  id: string;
+  name: string;
+  description: string | null;
+  location: string | null;
+  start_time: string;
+  end_time: string | null;
+  status: 'draft' | 'active' | 'completed';
+  notes: string | null;
+}
+
+interface EventEditorProps {
+  event: Event | null;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
+  const [name, setName] = useState(event?.name || '');
+  const [description, setDescription] = useState(event?.description || '');
+  const [location, setLocation] = useState(event?.location || '');
+  const [startTime, setStartTime] = useState(
+    event?.start_time ? new Date(event.start_time).toISOString().slice(0, 16) : ''
+  );
+  const [endTime, setEndTime] = useState(
+    event?.end_time ? new Date(event.end_time).toISOString().slice(0, 16) : ''
+  );
+  const [notes, setNotes] = useState(event?.notes || '');
+  const [items, setItems] = useState<EventItem[]>([]);
+  const [bakes, setBakes] = useState<Bake[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [showBakeSelector, setShowBakeSelector] = useState(false);
+
+  useEffect(() => {
+    loadBakes();
+    if (event) {
+      loadEventItems();
+    }
+  }, [event]);
+
+  const loadBakes = async () => {
+    const { data } = await supabase
+      .from('bakes')
+      .select('*')
+      .eq('status', 'published')
+      .order('title');
+    setBakes(data || []);
+  };
+
+  const loadEventItems = async () => {
+    if (!event) return;
+    const { data } = await supabase
+      .from('event_items')
+      .select('*')
+      .eq('event_id', event.id);
+    if (data) {
+      setItems(data.map(item => ({
+        id: item.id,
+        bake_id: item.bake_id,
+        name: item.name,
+        cogs: Number(item.cogs),
+        price: Number(item.price),
+        starting_quantity: item.starting_quantity,
+      })));
+    }
+  };
+
+  const addItem = () => {
+    setItems([...items, {
+      bake_id: null,
+      name: '',
+      cogs: 0,
+      price: 0,
+      starting_quantity: 0,
+    }]);
+  };
+
+  const addFromBake = (bake: Bake) => {
+    setItems([...items, {
+      bake_id: bake.id,
+      name: bake.title,
+      cogs: 0,
+      price: 0,
+      starting_quantity: 0,
+    }]);
+    setShowBakeSelector(false);
+  };
+
+  const updateItem = (index: number, field: keyof EventItem, value: string | number | null) => {
+    const updated = [...items];
+    updated[index] = { ...updated[index], [field]: value };
+    setItems(updated);
+  };
+
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const handleSave = async () => {
+    if (!name || !startTime) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in event name and start time.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      let eventId = event?.id;
+
+      if (event) {
+        // Update existing event
+        const { error } = await supabase
+          .from('events')
+          .update({
+            name,
+            description: description || null,
+            location: location || null,
+            start_time: new Date(startTime).toISOString(),
+            end_time: endTime ? new Date(endTime).toISOString() : null,
+            notes: notes || null,
+          })
+          .eq('id', event.id);
+
+        if (error) throw error;
+      } else {
+        // Create new event
+        const { data, error } = await supabase
+          .from('events')
+          .insert({
+            name,
+            description: description || null,
+            location: location || null,
+            start_time: new Date(startTime).toISOString(),
+            end_time: endTime ? new Date(endTime).toISOString() : null,
+            notes: notes || null,
+            status: 'draft',
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        eventId = data.id;
+      }
+
+      // Handle items - delete existing and insert new
+      if (event) {
+        await supabase
+          .from('event_items')
+          .delete()
+          .eq('event_id', event.id);
+      }
+
+      if (items.length > 0 && eventId) {
+        const { error: itemsError } = await supabase
+          .from('event_items')
+          .insert(
+            items.map(item => ({
+              event_id: eventId,
+              bake_id: item.bake_id,
+              name: item.name,
+              cogs: item.cogs,
+              price: item.price,
+              starting_quantity: item.starting_quantity,
+            }))
+          );
+
+        if (itemsError) throw itemsError;
+      }
+
+      toast({
+        title: 'Success',
+        description: `Event ${event ? 'updated' : 'created'} successfully.`,
+      });
+      onSave();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save event.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" onClick={onCancel}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
+        <h2 className="text-2xl font-semibold text-foreground">
+          {event ? 'edit event' : 'new event'}
+        </h2>
+      </div>
+
+      <div className="bg-card rounded-lg p-6 space-y-6">
+        {/* Event Details */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Event Name *</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Farmer's Market Pop-up"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="location">Location</Label>
+            <Input
+              id="location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g., Downtown Farmer's Market"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="startTime">Start Time *</Label>
+            <Input
+              id="startTime"
+              type="datetime-local"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="endTime">End Time</Label>
+            <Input
+              id="endTime"
+              type="datetime-local"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Event details..."
+            rows={3}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="notes">Notes</Label>
+          <Textarea
+            id="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Internal notes for this event..."
+            rows={2}
+          />
+        </div>
+
+        {/* Items Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label className="text-lg font-medium">Inventory Items</Label>
+            <div className="flex gap-2">
+              <Dialog open={showBakeSelector} onOpenChange={setShowBakeSelector}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Link className="w-4 h-4 mr-2" />
+                    From Catalog
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Select from Bakes Catalog</DialogTitle>
+                  </DialogHeader>
+                  <div className="max-h-96 overflow-y-auto space-y-2">
+                    {bakes.map((bake) => (
+                      <button
+                        key={bake.id}
+                        onClick={() => addFromBake(bake)}
+                        className="w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors"
+                      >
+                        <span className="font-medium">{bake.title}</span>
+                      </button>
+                    ))}
+                    {bakes.length === 0 && (
+                      <p className="text-muted-foreground text-center py-4">
+                        No published bakes available
+                      </p>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Button variant="outline" size="sm" onClick={addItem}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Custom
+              </Button>
+            </div>
+          </div>
+
+          {items.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">
+              No items added yet. Add items from your catalog or create custom items.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-secondary rounded-lg">
+                  <div className="col-span-12 md:col-span-4 space-y-1">
+                    <Label className="text-xs">Item Name</Label>
+                    <Input
+                      value={item.name}
+                      onChange={(e) => updateItem(index, 'name', e.target.value)}
+                      placeholder="Item name"
+                    />
+                  </div>
+                  <div className="col-span-6 md:col-span-2 space-y-1">
+                    <Label className="text-xs">COGS ($)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={item.cogs}
+                      onChange={(e) => updateItem(index, 'cogs', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="col-span-6 md:col-span-2 space-y-1">
+                    <Label className="text-xs">Price ($)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={item.price}
+                      onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="col-span-6 md:col-span-2 space-y-1">
+                    <Label className="text-xs">Qty</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={item.starting_quantity}
+                      onChange={(e) => updateItem(index, 'starting_quantity', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="col-span-6 md:col-span-2 flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeItem(index)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Save Buttons */}
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-pink-soft hover:bg-pink-medium"
+          >
+            {saving ? 'Saving...' : event ? 'Update Event' : 'Create Event'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};

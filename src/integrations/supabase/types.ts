@@ -89,6 +89,137 @@ export type Database = {
         }
         Relationships: []
       }
+      event_items: {
+        Row: {
+          bake_id: string | null
+          cogs: number
+          created_at: string
+          event_id: string
+          id: string
+          name: string
+          price: number
+          quantity_sold: number
+          starting_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          bake_id?: string | null
+          cogs?: number
+          created_at?: string
+          event_id: string
+          id?: string
+          name: string
+          price: number
+          quantity_sold?: number
+          starting_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          bake_id?: string | null
+          cogs?: number
+          created_at?: string
+          event_id?: string
+          id?: string
+          name?: string
+          price?: number
+          quantity_sold?: number
+          starting_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_items_bake_id_fkey"
+            columns: ["bake_id"]
+            isOneToOne: false
+            referencedRelation: "bakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_items_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_sales: {
+        Row: {
+          created_at: string
+          event_item_id: string
+          id: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          event_item_id: string
+          id?: string
+          quantity?: number
+          total_price: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          event_item_id?: string
+          id?: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_sales_event_item_id_fkey"
+            columns: ["event_item_id"]
+            isOneToOne: false
+            referencedRelation: "event_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          end_time: string | null
+          id: string
+          location: string | null
+          name: string
+          notes: string | null
+          start_time: string
+          status: Database["public"]["Enums"]["event_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          location?: string | null
+          name: string
+          notes?: string | null
+          start_time: string
+          status?: Database["public"]["Enums"]["event_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          notes?: string | null
+          start_time?: string
+          status?: Database["public"]["Enums"]["event_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           additional_notes: string | null
@@ -211,6 +342,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      event_status: "draft" | "active" | "completed"
       order_status:
         | "pending"
         | "confirmed"
@@ -346,6 +478,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      event_status: ["draft", "active", "completed"],
       order_status: [
         "pending",
         "confirmed",
