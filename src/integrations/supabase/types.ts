@@ -182,6 +182,9 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          current_day: number | null
+          day_close_time: string | null
+          day_open_time: string | null
           description: string | null
           end_time: string | null
           id: string
@@ -195,6 +198,9 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          current_day?: number | null
+          day_close_time?: string | null
+          day_open_time?: string | null
           description?: string | null
           end_time?: string | null
           id?: string
@@ -208,6 +214,9 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          current_day?: number | null
+          day_close_time?: string | null
+          day_open_time?: string | null
           description?: string | null
           end_time?: string | null
           id?: string
