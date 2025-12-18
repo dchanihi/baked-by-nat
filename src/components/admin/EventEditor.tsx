@@ -8,6 +8,7 @@ import { toast } from '@/components/ui/use-toast';
 import { ArrowLeft, Plus, Trash2, Link } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CurrencyInput } from './CurrencyInput';
+import { NumericInput } from './NumericInput';
 import {
   Select,
   SelectContent,
@@ -392,12 +393,9 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                         />
                       </div>
                       <div className="px-2 py-1.5">
-                        <Input
-                          type="number"
-                          min="0"
+                        <NumericInput
                           value={item.starting_quantity}
-                          onChange={(e) => updateItem(index, 'starting_quantity', parseInt(e.target.value) || 0)}
-                          className="h-8 border-0 bg-transparent text-center focus-visible:ring-1 focus-visible:ring-offset-0"
+                          onChange={(val) => updateItem(index, 'starting_quantity', val)}
                         />
                       </div>
                       <div className="px-2 py-1.5 flex justify-center">
