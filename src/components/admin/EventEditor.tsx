@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Trash2, Link, Cookie, Cake, CakeSlice, Croissant, IceCream, Cherry, Coffee, Candy, Package } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Link, Cookie, Cake, CakeSlice, Croissant, IceCream, Cherry, Coffee, Candy, Package, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CurrencyInput } from './CurrencyInput';
 import { NumericInput } from './NumericInput';
@@ -78,6 +78,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
   const [showBakeSelector, setShowBakeSelector] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   
   // Refs for cell navigation - columns: 0=COGS, 1=Price, 2=Qty
   const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -460,6 +461,53 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
             </div>
           </div>
 
+          {/* Category Filter */}
+          {categories.length > 0 && items.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <button
+                onClick={() => setCategoryFilter(null)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  categoryFilter === null
+                    ? 'bg-pink-soft text-white'
+                    : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                }`}
+              >
+                All ({items.length})
+              </button>
+              <button
+                onClick={() => setCategoryFilter('uncategorized')}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                  categoryFilter === 'uncategorized'
+                    ? 'bg-pink-soft text-white'
+                    : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                }`}
+              >
+                <Package className="w-3 h-3" />
+                Uncategorized ({items.filter(i => !i.category).length})
+              </button>
+              {categories.map((cat, catIndex) => {
+                const Icon = getCategoryIcon(catIndex);
+                const count = items.filter(i => i.category === cat.name).length;
+                if (count === 0) return null;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setCategoryFilter(cat.name)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                      categoryFilter === cat.name
+                        ? 'bg-pink-soft text-white'
+                        : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                    }`}
+                  >
+                    <Icon className="w-3 h-3" />
+                    {cat.name} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div className="border rounded-lg overflow-hidden">
             {/* Table Header */}
             <div className="grid grid-cols-[1fr_140px_100px_100px_80px_48px] bg-muted/50 border-b">
@@ -479,9 +527,16 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
             ) : (
               <div className="divide-y" onPaste={handlePaste}>
                 <AnimatePresence mode="popLayout">
-                  {items.map((item, index) => (
+                  {items
+                    .map((item, index) => ({ item, originalIndex: index }))
+                    .filter(({ item }) => {
+                      if (categoryFilter === null) return true;
+                      if (categoryFilter === 'uncategorized') return !item.category;
+                      return item.category === categoryFilter;
+                    })
+                    .map(({ item, originalIndex }) => (
                     <motion.div
-                      key={item.id || `new-${index}`}
+                      key={item.id || `new-${originalIndex}`}
                       layout
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
@@ -492,7 +547,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                       <div className="px-2 py-1.5">
                         <Input
                           value={item.name}
-                          onChange={(e) => updateItem(index, 'name', e.target.value)}
+                          onChange={(e) => updateItem(originalIndex, 'name', e.target.value)}
                           placeholder="Item name"
                           className="h-8 border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-offset-0"
                         />
@@ -500,7 +555,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                       <div className="px-2 py-1.5">
                         <Select
                           value={item.category || 'none'}
-                          onValueChange={(val) => updateItem(index, 'category', val === 'none' ? null : val)}
+                          onValueChange={(val) => updateItem(originalIndex, 'category', val === 'none' ? null : val)}
                         >
                           <SelectTrigger className="h-8 border-0 bg-transparent focus:ring-1 focus:ring-offset-0">
                             <SelectValue placeholder="Select">
@@ -539,50 +594,50 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                       <div 
                         className="px-2 py-1.5"
                         ref={(el) => {
-                          if (el) cellRefs.current.set(getCellKey(index, 0), el);
+                          if (el) cellRefs.current.set(getCellKey(originalIndex, 0), el);
                         }}
                       >
                         <CurrencyInput
                           value={item.cogs}
-                          onChange={(val) => updateItem(index, 'cogs', val)}
-                          onNavigate={(dir) => handleCellNavigate(index, 0, dir)}
-                          onEnter={() => handleCellNavigate(index, 0, 'down')}
-                          onFocus={() => handleCellFocus(index, 0)}
+                          onChange={(val) => updateItem(originalIndex, 'cogs', val)}
+                          onNavigate={(dir) => handleCellNavigate(originalIndex, 0, dir)}
+                          onEnter={() => handleCellNavigate(originalIndex, 0, 'down')}
+                          onFocus={() => handleCellFocus(originalIndex, 0)}
                         />
                       </div>
                       <div 
                         className="px-2 py-1.5"
                         ref={(el) => {
-                          if (el) cellRefs.current.set(getCellKey(index, 1), el);
+                          if (el) cellRefs.current.set(getCellKey(originalIndex, 1), el);
                         }}
                       >
                         <CurrencyInput
                           value={item.price}
-                          onChange={(val) => updateItem(index, 'price', val)}
-                          onNavigate={(dir) => handleCellNavigate(index, 1, dir)}
-                          onEnter={() => handleCellNavigate(index, 1, 'down')}
-                          onFocus={() => handleCellFocus(index, 1)}
+                          onChange={(val) => updateItem(originalIndex, 'price', val)}
+                          onNavigate={(dir) => handleCellNavigate(originalIndex, 1, dir)}
+                          onEnter={() => handleCellNavigate(originalIndex, 1, 'down')}
+                          onFocus={() => handleCellFocus(originalIndex, 1)}
                         />
                       </div>
                       <div 
                         className="px-2 py-1.5"
                         ref={(el) => {
-                          if (el) cellRefs.current.set(getCellKey(index, 2), el);
+                          if (el) cellRefs.current.set(getCellKey(originalIndex, 2), el);
                         }}
                       >
                         <NumericInput
                           value={item.starting_quantity}
-                          onChange={(val) => updateItem(index, 'starting_quantity', val)}
-                          onNavigate={(dir) => handleCellNavigate(index, 2, dir)}
-                          onEnter={() => handleCellNavigate(index, 2, 'down')}
-                          onFocus={() => handleCellFocus(index, 2)}
+                          onChange={(val) => updateItem(originalIndex, 'starting_quantity', val)}
+                          onNavigate={(dir) => handleCellNavigate(originalIndex, 2, dir)}
+                          onEnter={() => handleCellNavigate(originalIndex, 2, 'down')}
+                          onFocus={() => handleCellFocus(originalIndex, 2)}
                         />
                       </div>
                       <div className="px-2 py-1.5 flex justify-center">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => removeItem(index)}
+                          onClick={() => removeItem(originalIndex)}
                           className="h-7 w-7 text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="w-4 h-4" />
