@@ -2,7 +2,7 @@ import {
   Cookie, Cake, CakeSlice, Croissant, IceCream, Cherry, Coffee, Candy, 
   Package, UtensilsCrossed, Heart, Star, Sparkles, CircleDot, Donut,
   Sandwich, Pizza, Beef, Apple, Citrus, Grape, Banana, Carrot,
-  Milk, Egg, Wheat, ChefHat, CupSoda, Salad, Hop, Circle,
+  Milk, Egg, Wheat, ChefHat, CupSoda, Salad, Hop, Layers2,
   type LucideIcon
 } from 'lucide-react';
 
@@ -15,7 +15,7 @@ export const CATEGORY_ICONS: { name: string; icon: LucideIcon; label: string }[]
   { name: 'croissant', icon: Croissant, label: 'Croissant' },
   { name: 'loaf', icon: Sandwich, label: 'Loaf/Bread' },
   { name: 'sourdough', icon: Salad, label: 'Sourdough' },
-  { name: 'macaron', icon: Circle, label: 'Macaron' },
+  { name: 'macaron', icon: Layers2, label: 'Macaron' },
   { name: 'ice-cream', icon: IceCream, label: 'Ice Cream' },
   { name: 'cherry', icon: Cherry, label: 'Cherry' },
   { name: 'coffee', icon: Coffee, label: 'Coffee' },
