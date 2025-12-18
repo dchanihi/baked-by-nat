@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3, Search, Filter, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getIconComponent } from '@/lib/categoryIcons';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 interface EventItem {
   id: string;
   name: string;
@@ -15,6 +18,7 @@ interface EventItem {
   price: number;
   starting_quantity: number;
   quantity_sold: number;
+  category: string | null;
 }
 interface Event {
   id: string;
@@ -60,10 +64,60 @@ export const EventRunner = ({
   const [editingInventory, setEditingInventory] = useState(false);
   const [inventoryEdits, setInventoryEdits] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState('sales');
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('name');
 
   // Determine if we need to show the start confirmation
   const isDayActive = currentEvent.day_open_time && !currentEvent.day_close_time;
   const currentDay = currentEvent.current_day || 0;
+  
+  // Get unique categories from items
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    items.forEach(item => {
+      if (item.category) cats.add(item.category);
+    });
+    return Array.from(cats).sort();
+  }, [items]);
+  
+  // Filtered and sorted items
+  const filteredItems = useMemo(() => {
+    let result = [...items];
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(item => item.name.toLowerCase().includes(query));
+    }
+    
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      result = result.filter(item => item.category === selectedCategory);
+    }
+    
+    // Sort items
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'category':
+          return (a.category || '').localeCompare(b.category || '');
+        case 'price-asc':
+          return a.price - b.price;
+        case 'price-desc':
+          return b.price - a.price;
+        case 'remaining':
+          return (b.starting_quantity - b.quantity_sold) - (a.starting_quantity - a.quantity_sold);
+        default:
+          return 0;
+      }
+    });
+    
+    return result;
+  }, [items, searchQuery, selectedCategory, sortBy]);
   useEffect(() => {
     loadItems();
     loadEventDetails();
@@ -100,7 +154,8 @@ export const EventRunner = ({
         cogs: Number(item.cogs),
         price: Number(item.price),
         starting_quantity: item.starting_quantity,
-        quantity_sold: item.quantity_sold
+        quantity_sold: item.quantity_sold,
+        category: item.category || null
       })) || [];
       setItems(loadedItems);
       // Initialize inventory edits
@@ -548,29 +603,102 @@ export const EventRunner = ({
             </div>
           </div>
 
+          {/* Search and Filter Controls */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-9"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+            
+            {/* Category Filter */}
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-full sm:w-48">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map(cat => {
+                  const IconComponent = getIconComponent(cat);
+                  return (
+                    <SelectItem key={cat} value={cat}>
+                      <div className="flex items-center gap-2">
+                        <IconComponent className="w-4 h-4" />
+                        <span className="capitalize">{cat}</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            
+            {/* Sort */}
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-full sm:w-44">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name (A-Z)</SelectItem>
+                <SelectItem value="category">Category</SelectItem>
+                <SelectItem value="price-asc">Price (Low-High)</SelectItem>
+                <SelectItem value="price-desc">Price (High-Low)</SelectItem>
+                <SelectItem value="remaining">Most Remaining</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Items Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map(item => {
-            const remaining = item.starting_quantity - item.quantity_sold;
-            const itemRevenue = item.price * item.quantity_sold;
-            const soldPercentage = item.starting_quantity > 0 ? item.quantity_sold / item.starting_quantity * 100 : 0;
-            return <div key={item.id} className="bg-card rounded-lg p-4 border space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-semibold">{item.name}</h3>
-                      <p className="text-sm text-muted-foreground">${item.price.toFixed(2)} each</p>
+            {filteredItems.map(item => {
+              const remaining = item.starting_quantity - item.quantity_sold;
+              const itemRevenue = item.price * item.quantity_sold;
+              const soldPercentage = item.starting_quantity > 0 ? item.quantity_sold / item.starting_quantity * 100 : 0;
+              const CategoryIcon = getIconComponent(item.category);
+              
+              return (
+                <div key={item.id} className="bg-card rounded-lg p-4 border space-y-3">
+                  <div className="flex gap-3">
+                    {/* Category Icon */}
+                    <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-pink-soft/10 flex items-center justify-center">
+                      <CategoryIcon className="w-7 h-7 text-pink-soft" />
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-green-600">${itemRevenue.toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground">{item.quantity_sold} sold</p>
+                    
+                    {/* Item Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-semibold truncate">{item.name}</h3>
+                          <p className="text-sm text-muted-foreground">${item.price.toFixed(2)} each</p>
+                        </div>
+                        <div className="text-right ml-2">
+                          <p className="font-bold text-green-600">${itemRevenue.toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">{item.quantity_sold} sold</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   {/* Progress bar */}
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div className="bg-pink-soft h-2 rounded-full transition-all" style={{
-                  width: `${soldPercentage}%`
-                }} />
+                      width: `${soldPercentage}%`
+                    }} />
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
@@ -583,20 +711,32 @@ export const EventRunner = ({
                         <Plus className="w-4 h-4" />
                       </Button>
                       <Button size="sm" variant="secondary" onClick={() => {
-                    setManualSaleItem(item);
-                    setManualQuantity(1);
-                  }} disabled={remaining <= 0}>
+                        setManualSaleItem(item);
+                        setManualQuantity(1);
+                      }} disabled={remaining <= 0}>
                         +#
                       </Button>
                     </div>
                   </div>
-                </div>;
-          })}
+                </div>
+              );
+            })}
           </div>
 
-          {items.length === 0 && <div className="text-center py-12 text-muted-foreground">
+          {filteredItems.length === 0 && items.length > 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No items match your search or filter.</p>
+              <Button variant="link" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); }}>
+                Clear filters
+              </Button>
+            </div>
+          )}
+
+          {items.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
               <p>No items in this event. Go back and add some inventory first.</p>
-            </div>}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="summary" className="space-y-6 mt-4">
