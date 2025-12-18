@@ -9,9 +9,10 @@ interface NumericInputProps {
   min?: number;
   onNavigate?: (direction: 'up' | 'down' | 'left' | 'right') => void;
   onEnter?: () => void;
+  onFocus?: () => void;
 }
 
-export const NumericInput = ({ value, onChange, className, min = 0, onNavigate, onEnter }: NumericInputProps) => {
+export const NumericInput = ({ value, onChange, className, min = 0, onNavigate, onEnter, onFocus }: NumericInputProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isSelected, setIsSelected] = useState(false);
   const [tempValue, setTempValue] = useState('');
@@ -24,6 +25,7 @@ export const NumericInput = ({ value, onChange, className, min = 0, onNavigate, 
   };
 
   const handleClick = () => {
+    onFocus?.();
     if (value === 0) {
       enterEditMode();
     } else {
@@ -32,6 +34,7 @@ export const NumericInput = ({ value, onChange, className, min = 0, onNavigate, 
   };
 
   const handleDoubleClick = () => {
+    onFocus?.();
     enterEditMode();
   };
 

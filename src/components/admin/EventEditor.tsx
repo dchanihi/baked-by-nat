@@ -71,6 +71,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
   
   // Refs for cell navigation - columns: 0=COGS, 1=Price, 2=Qty
   const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
   
   const getCellKey = (row: number, col: number) => `${row}-${col}`;
   
@@ -80,6 +81,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
     if (cell) {
       const focusable = cell.querySelector('[tabindex="0"]') as HTMLElement;
       focusable?.focus();
+      setActiveCell({ row, col });
     }
   }, []);
   
@@ -108,6 +110,57 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
     
     setTimeout(() => focusCell(newRow, newCol), 0);
   }, [items.length, focusCell]);
+
+  // Handle paste from Excel - tab-separated columns, newline-separated rows
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    if (!activeCell) return;
+    
+    const pastedData = e.clipboardData.getData('text');
+    if (!pastedData) return;
+    
+    // Parse Excel data (tab-separated columns, newline-separated rows)
+    const rows = pastedData.split(/\r?\n/).filter(row => row.trim());
+    if (rows.length === 0) return;
+    
+    e.preventDefault();
+    
+    const updated = [...items];
+    const colFields: (keyof EventItem)[] = ['cogs', 'price', 'starting_quantity'];
+    
+    rows.forEach((row, rowOffset) => {
+      const targetRow = activeCell.row + rowOffset;
+      if (targetRow >= updated.length) return;
+      
+      const cells = row.split('\t');
+      cells.forEach((cellValue, colOffset) => {
+        const targetCol = activeCell.col + colOffset;
+        if (targetCol > 2) return;
+        
+        const field = colFields[targetCol];
+        // Parse the value - remove currency symbols and commas
+        const cleanValue = cellValue.replace(/[$,]/g, '').trim();
+        const numValue = parseFloat(cleanValue);
+        
+        if (!isNaN(numValue)) {
+          if (field === 'starting_quantity') {
+            updated[targetRow] = { ...updated[targetRow], [field]: Math.round(numValue) };
+          } else {
+            updated[targetRow] = { ...updated[targetRow], [field]: numValue };
+          }
+        }
+      });
+    });
+    
+    setItems(updated);
+    toast({
+      title: 'Pasted',
+      description: `Updated ${Math.min(rows.length, items.length - activeCell.row)} row(s)`,
+    });
+  }, [activeCell, items]);
+
+  const handleCellFocus = useCallback((row: number, col: number) => {
+    setActiveCell({ row, col });
+  }, []);
 
   useEffect(() => {
     loadBakes();
@@ -400,7 +453,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                 No items added yet. Add items from your catalog or create custom items.
               </div>
             ) : (
-              <div className="divide-y">
+              <div className="divide-y" onPaste={handlePaste}>
                 <AnimatePresence mode="popLayout">
                   {items.map((item, index) => (
                     <motion.div
@@ -431,6 +484,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                           onChange={(val) => updateItem(index, 'cogs', val)}
                           onNavigate={(dir) => handleCellNavigate(index, 0, dir)}
                           onEnter={() => handleCellNavigate(index, 0, 'down')}
+                          onFocus={() => handleCellFocus(index, 0)}
                         />
                       </div>
                       <div 
@@ -444,6 +498,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                           onChange={(val) => updateItem(index, 'price', val)}
                           onNavigate={(dir) => handleCellNavigate(index, 1, dir)}
                           onEnter={() => handleCellNavigate(index, 1, 'down')}
+                          onFocus={() => handleCellFocus(index, 1)}
                         />
                       </div>
                       <div 
@@ -457,6 +512,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                           onChange={(val) => updateItem(index, 'starting_quantity', val)}
                           onNavigate={(dir) => handleCellNavigate(index, 2, dir)}
                           onEnter={() => handleCellNavigate(index, 2, 'down')}
+                          onFocus={() => handleCellFocus(index, 2)}
                         />
                       </div>
                       <div className="px-2 py-1.5 flex justify-center">
