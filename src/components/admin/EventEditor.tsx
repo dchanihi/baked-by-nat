@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import { ArrowLeft, Plus, Trash2, Link } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CurrencyInput } from './CurrencyInput';
 import {
   Select,
   SelectContent,
@@ -348,7 +349,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground">Item Name</div>
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">COGS ($)</div>
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">Price ($)</div>
-              <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">Qty</div>
+              <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-center">Qty</div>
               <div className="px-3 py-2"></div>
             </div>
 
@@ -379,23 +380,15 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                         />
                       </div>
                       <div className="px-2 py-1.5">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                        <CurrencyInput
                           value={item.cogs}
-                          onChange={(e) => updateItem(index, 'cogs', parseFloat(e.target.value) || 0)}
-                          className="h-8 border-0 bg-transparent text-right focus-visible:ring-1 focus-visible:ring-offset-0"
+                          onChange={(val) => updateItem(index, 'cogs', val)}
                         />
                       </div>
                       <div className="px-2 py-1.5">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                        <CurrencyInput
                           value={item.price}
-                          onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)}
-                          className="h-8 border-0 bg-transparent text-right focus-visible:ring-1 focus-visible:ring-offset-0"
+                          onChange={(val) => updateItem(index, 'price', val)}
                         />
                       </div>
                       <div className="px-2 py-1.5">
@@ -404,7 +397,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                           min="0"
                           value={item.starting_quantity}
                           onChange={(e) => updateItem(index, 'starting_quantity', parseInt(e.target.value) || 0)}
-                          className="h-8 border-0 bg-transparent text-right focus-visible:ring-1 focus-visible:ring-offset-0"
+                          className="h-8 border-0 bg-transparent text-center focus-visible:ring-1 focus-visible:ring-offset-0"
                         />
                       </div>
                       <div className="px-2 py-1.5 flex justify-center">
