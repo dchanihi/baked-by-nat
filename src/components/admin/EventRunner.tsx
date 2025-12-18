@@ -64,6 +64,7 @@ export const EventRunner = ({
   const [editingInventory, setEditingInventory] = useState(false);
   const [inventoryEdits, setInventoryEdits] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState('sales');
+  const [categoryIconMap, setCategoryIconMap] = useState<Record<string, string>>({});
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,6 +83,13 @@ export const EventRunner = ({
     });
     return Array.from(cats).sort();
   }, [items]);
+  
+  // Helper to get the icon for a category name
+  const getCategoryIcon = (categoryName: string | null) => {
+    if (!categoryName) return getIconComponent(null);
+    const iconName = categoryIconMap[categoryName];
+    return getIconComponent(iconName || null);
+  };
   
   // Filtered and sorted items
   const filteredItems = useMemo(() => {
@@ -122,7 +130,21 @@ export const EventRunner = ({
     loadItems();
     loadEventDetails();
     loadDaySummaries();
+    loadCategories();
   }, [event.id]);
+  
+  const loadCategories = async () => {
+    const { data } = await supabase.from('categories').select('name, icon');
+    if (data) {
+      const iconMap: Record<string, string> = {};
+      data.forEach(cat => {
+        if (cat.name && cat.icon) {
+          iconMap[cat.name] = cat.icon;
+        }
+      });
+      setCategoryIconMap(iconMap);
+    }
+  };
   const loadEventDetails = async () => {
     const {
       data,
@@ -635,7 +657,7 @@ export const EventRunner = ({
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {categories.map(cat => {
-                  const IconComponent = getIconComponent(cat);
+                  const IconComponent = getCategoryIcon(cat);
                   return (
                     <SelectItem key={cat} value={cat}>
                       <div className="flex items-center gap-2">
@@ -669,7 +691,7 @@ export const EventRunner = ({
               const remaining = item.starting_quantity - item.quantity_sold;
               const itemRevenue = item.price * item.quantity_sold;
               const soldPercentage = item.starting_quantity > 0 ? item.quantity_sold / item.starting_quantity * 100 : 0;
-              const CategoryIcon = getIconComponent(item.category);
+              const CategoryIcon = getCategoryIcon(item.category);
               
               return (
                 <div key={item.id} className="bg-card rounded-lg p-4 border space-y-3">
