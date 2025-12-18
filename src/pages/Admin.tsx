@@ -274,6 +274,11 @@ const Admin = () => {
             event={runningEvent}
             onBack={handleBackFromEvent}
             onUpdate={handleEventUpdate}
+            onEdit={() => {
+              setEditingEvent(runningEvent);
+              setIsCreatingEvent(true);
+              setRunningEvent(null);
+            }}
           />
         ) : isCreatingEvent ? (
           <EventEditor

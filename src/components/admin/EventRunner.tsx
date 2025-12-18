@@ -55,9 +55,10 @@ interface EventRunnerProps {
   event: Event;
   onBack: () => void;
   onUpdate: () => void;
+  onEdit?: () => void;
 }
 
-export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
+export const EventRunner = ({ event, onBack, onUpdate, onEdit }: EventRunnerProps) => {
   const [items, setItems] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [manualSaleItem, setManualSaleItem] = useState<EventItem | null>(null);
@@ -587,6 +588,16 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
           </div>
         </div>
         <div className="flex gap-2">
+          {onEdit && (
+            <Button
+              onClick={onEdit}
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+            >
+              <Edit2 className="w-4 h-4" />
+            </Button>
+          )}
           <Button
             onClick={() => setShowEndDayDialog(true)}
             variant="outline"
