@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import { ArrowLeft, Plus, Trash2, Link } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Select,
   SelectContent,
@@ -347,57 +348,67 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
             </p>
           ) : (
             <div className="space-y-3 flex flex-col">
-              {items.map((item, index) => (
-                <div key={item.id || `new-${index}`} className="grid grid-cols-12 gap-2 items-end p-3 bg-secondary rounded-lg flex-shrink-0">
-                  <div className="col-span-12 md:col-span-4 space-y-1">
-                    <Label className="text-xs">Item Name</Label>
-                    <Input
-                      value={item.name}
-                      onChange={(e) => updateItem(index, 'name', e.target.value)}
-                      placeholder="Item name"
-                    />
-                  </div>
-                  <div className="col-span-6 md:col-span-2 space-y-1">
-                    <Label className="text-xs">COGS ($)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={item.cogs}
-                      onChange={(e) => updateItem(index, 'cogs', parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="col-span-6 md:col-span-2 space-y-1">
-                    <Label className="text-xs">Price ($)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={item.price}
-                      onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="col-span-6 md:col-span-2 space-y-1">
-                    <Label className="text-xs">Qty</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={item.starting_quantity}
-                      onChange={(e) => updateItem(index, 'starting_quantity', parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="col-span-6 md:col-span-2 flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeItem(index)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+              <AnimatePresence mode="popLayout">
+                {items.map((item, index) => (
+                  <motion.div
+                    key={item.id || `new-${index}`}
+                    layout
+                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    className="grid grid-cols-12 gap-2 items-end p-3 bg-secondary rounded-lg"
+                  >
+                    <div className="col-span-12 md:col-span-4 space-y-1">
+                      <Label className="text-xs">Item Name</Label>
+                      <Input
+                        value={item.name}
+                        onChange={(e) => updateItem(index, 'name', e.target.value)}
+                        placeholder="Item name"
+                      />
+                    </div>
+                    <div className="col-span-6 md:col-span-2 space-y-1">
+                      <Label className="text-xs">COGS ($)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.cogs}
+                        onChange={(e) => updateItem(index, 'cogs', parseFloat(e.target.value) || 0)}
+                      />
+                    </div>
+                    <div className="col-span-6 md:col-span-2 space-y-1">
+                      <Label className="text-xs">Price ($)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.price}
+                        onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)}
+                      />
+                    </div>
+                    <div className="col-span-6 md:col-span-2 space-y-1">
+                      <Label className="text-xs">Qty</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={item.starting_quantity}
+                        onChange={(e) => updateItem(index, 'starting_quantity', parseInt(e.target.value) || 0)}
+                      />
+                    </div>
+                    <div className="col-span-6 md:col-span-2 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeItem(index)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
         </div>
