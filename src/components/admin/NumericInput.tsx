@@ -104,8 +104,10 @@ export const NumericInput = ({ value, onChange, className, min = 0, onNavigate, 
         setIsSelected(false);
         onNavigate?.('right');
       } else if (/^[0-9]$/.test(e.key)) {
-        enterEditMode();
+        e.preventDefault();
         setTempValue(e.key);
+        setIsFocused(true);
+        setIsSelected(false);
       }
     }
   };
