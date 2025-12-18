@@ -8,6 +8,7 @@ import { toast } from '@/components/ui/use-toast';
 import { ArrowLeft, Plus, Trash2, Link, Package, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CurrencyInput } from './CurrencyInput';
+import { LocationAutocomplete } from './LocationAutocomplete';
 import { NumericInput } from './NumericInput';
 import { getIconComponent } from '@/lib/categoryIcons';
 import {
@@ -362,11 +363,10 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
           </div>
           <div className="space-y-2">
             <Label htmlFor="location">Location</Label>
-            <Input
-              id="location"
+            <LocationAutocomplete
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g., Downtown Farmer's Market"
+              onChange={setLocation}
+              placeholder="Search for an address..."
             />
           </div>
         </div>
