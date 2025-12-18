@@ -170,7 +170,7 @@ const SortableCategory = ({
         </>
       ) : (
         <>
-          <CategoryIcon className="w-5 h-5 text-white fill-white" />
+          <CategoryIcon className="w-5 h-5 text-primary" />
           <span className="flex-1 font-medium">{category.name}</span>
           <Button
             variant="ghost"
