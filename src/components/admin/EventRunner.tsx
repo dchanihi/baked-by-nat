@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   Dialog,
@@ -13,6 +13,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 
 interface EventItem {
   id: string;
@@ -36,6 +42,15 @@ interface Event {
   day_close_time?: string | null;
 }
 
+interface DaySummary {
+  id: string;
+  day_number: number;
+  open_time: string;
+  close_time: string | null;
+  revenue: number;
+  items_sold: number;
+}
+
 interface EventRunnerProps {
   event: Event;
   onBack: () => void;
@@ -51,6 +66,10 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
   const [showStartConfirm, setShowStartConfirm] = useState(false);
   const [showEndDayDialog, setShowEndDayDialog] = useState(false);
   const [currentEvent, setCurrentEvent] = useState<Event>(event);
+  const [daySummaries, setDaySummaries] = useState<DaySummary[]>([]);
+  const [editingInventory, setEditingInventory] = useState(false);
+  const [inventoryEdits, setInventoryEdits] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = useState('sales');
 
   // Determine if we need to show the start confirmation
   const isDayActive = currentEvent.day_open_time && !currentEvent.day_close_time;
@@ -59,6 +78,7 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
   useEffect(() => {
     loadItems();
     loadEventDetails();
+    loadDaySummaries();
   }, [event.id]);
 
   const loadEventDetails = async () => {
@@ -90,16 +110,42 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
         variant: 'destructive',
       });
     } else {
-      setItems(data?.map(item => ({
+      const loadedItems = data?.map(item => ({
         id: item.id,
         name: item.name,
         cogs: Number(item.cogs),
         price: Number(item.price),
         starting_quantity: item.starting_quantity,
         quantity_sold: item.quantity_sold,
-      })) || []);
+      })) || [];
+      setItems(loadedItems);
+      // Initialize inventory edits
+      const edits: Record<string, number> = {};
+      loadedItems.forEach(item => {
+        edits[item.id] = item.starting_quantity;
+      });
+      setInventoryEdits(edits);
     }
     setLoading(false);
+  };
+
+  const loadDaySummaries = async () => {
+    const { data, error } = await supabase
+      .from('event_day_summaries')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('day_number', { ascending: true });
+
+    if (!error && data) {
+      setDaySummaries(data.map(d => ({
+        id: d.id,
+        day_number: d.day_number,
+        open_time: d.open_time,
+        close_time: d.close_time,
+        revenue: Number(d.revenue),
+        items_sold: d.items_sold,
+      })));
+    }
   };
 
   const startDay = async () => {
@@ -133,6 +179,7 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
       day_close_time: null,
     });
     setShowStartConfirm(false);
+    setEditingInventory(false);
     onUpdate();
 
     toast({
@@ -143,6 +190,20 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
 
   const endDay = async () => {
     const closeTime = new Date().toISOString();
+
+    // Calculate today's metrics (since day started)
+    const dayRevenue = totalRevenue;
+    const dayItemsSold = totalItemsSold;
+
+    // Save day summary
+    await supabase.from('event_day_summaries').insert({
+      event_id: event.id,
+      day_number: currentDay,
+      open_time: currentEvent.day_open_time!,
+      close_time: closeTime,
+      revenue: dayRevenue,
+      items_sold: dayItemsSold,
+    });
 
     const { error } = await supabase
       .from('events')
@@ -166,11 +227,34 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
     });
     setShowEndDayDialog(false);
     setShowStartConfirm(true);
+    loadDaySummaries();
     onUpdate();
 
     toast({
       title: `Day ${currentDay} Ended`,
       description: `Event closed at ${format(new Date(closeTime), 'h:mm a')}`,
+    });
+  };
+
+  const saveInventoryEdits = async () => {
+    const updates = Object.entries(inventoryEdits).map(([id, quantity]) => ({
+      id,
+      starting_quantity: quantity,
+    }));
+
+    for (const update of updates) {
+      await supabase
+        .from('event_items')
+        .update({ starting_quantity: update.starting_quantity })
+        .eq('id', update.id);
+    }
+
+    await loadItems();
+    setEditingInventory(false);
+
+    toast({
+      title: 'Inventory Updated',
+      description: 'Starting quantities have been updated for the next day.',
     });
   };
 
@@ -259,6 +343,18 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
   const completeEvent = async () => {
     const closeTime = new Date().toISOString();
 
+    // Save final day summary if day was active
+    if (isDayActive) {
+      await supabase.from('event_day_summaries').insert({
+        event_id: event.id,
+        day_number: currentDay,
+        open_time: currentEvent.day_open_time!,
+        close_time: closeTime,
+        revenue: totalRevenue,
+        items_sold: totalItemsSold,
+      });
+    }
+
     await supabase
       .from('events')
       .update({
@@ -283,6 +379,10 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
   const totalItemsSold = items.reduce((sum, item) => sum + item.quantity_sold, 0);
   const totalInventory = items.reduce((sum, item) => sum + item.starting_quantity, 0);
 
+  // Calculate totals from all day summaries
+  const allDaysRevenue = daySummaries.reduce((sum, d) => sum + d.revenue, 0);
+  const allDaysItemsSold = daySummaries.reduce((sum, d) => sum + d.items_sold, 0);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -291,7 +391,7 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
     );
   }
 
-  // Start Confirmation Screen
+  // Start Confirmation Screen (with inventory editing for multi-day events)
   if (showStartConfirm) {
     const isFirstDay = currentDay === 0;
     const dayNumber = currentDay + 1;
@@ -305,21 +405,23 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
           </Button>
         </div>
 
-        <div className="max-w-md mx-auto">
-          <div className="bg-card rounded-xl border p-8 text-center space-y-6">
-            <div className="w-16 h-16 mx-auto rounded-full bg-pink-soft/20 flex items-center justify-center">
-              <Play className="w-8 h-8 text-pink-soft" />
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-card rounded-xl border p-8 space-y-6">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 mx-auto rounded-full bg-pink-soft/20 flex items-center justify-center">
+                <Play className="w-8 h-8 text-pink-soft" />
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-semibold text-foreground">{event.name}</h2>
+                <p className="text-muted-foreground mt-1">
+                  {format(new Date(event.start_time), 'EEEE, MMMM d, yyyy')}
+                  {event.location && ` • ${event.location}`}
+                </p>
+              </div>
             </div>
 
-            <div>
-              <h2 className="text-2xl font-semibold text-foreground">{event.name}</h2>
-              <p className="text-muted-foreground mt-1">
-                {format(new Date(event.start_time), 'EEEE, MMMM d, yyyy')}
-                {event.location && ` • ${event.location}`}
-              </p>
-            </div>
-
-            <div className="bg-secondary rounded-lg p-4 space-y-2 text-left">
+            <div className="bg-secondary rounded-lg p-4 space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span className="font-medium">Day {dayNumber}</span>
@@ -343,10 +445,106 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
               </div>
             )}
 
-            <div className="space-y-3">
+            {/* Day Summaries Section */}
+            {daySummaries.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-sm">Previous Days Summary</h3>
+                </div>
+                <div className="space-y-2">
+                  {daySummaries.map((day) => (
+                    <div key={day.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Day {day.day_number}</span>
+                        <span className="text-muted-foreground">
+                          {format(new Date(day.open_time), 'h:mm a')} - {day.close_time ? format(new Date(day.close_time), 'h:mm a') : 'ongoing'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-muted-foreground">{day.items_sold} sold</span>
+                        <span className="font-medium text-green-600">${day.revenue.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="bg-primary/10 rounded-lg p-3 flex justify-between items-center text-sm font-medium">
+                    <span>Total from previous days</span>
+                    <div className="flex items-center gap-4">
+                      <span>{allDaysItemsSold} sold</span>
+                      <span className="text-green-600">${allDaysRevenue.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Inventory Editing (for multi-day events) */}
+            {!isFirstDay && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-sm">Adjust Inventory for Day {dayNumber}</h3>
+                  {!editingInventory ? (
+                    <Button variant="outline" size="sm" onClick={() => setEditingInventory(true)}>
+                      <Edit2 className="w-4 h-4 mr-1" />
+                      Edit Quantities
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => {
+                        setEditingInventory(false);
+                        const edits: Record<string, number> = {};
+                        items.forEach(item => {
+                          edits[item.id] = item.starting_quantity;
+                        });
+                        setInventoryEdits(edits);
+                      }}>
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={saveInventoryEdits} className="bg-pink-soft hover:bg-pink-medium">
+                        Save Changes
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                
+                {editingInventory ? (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {items.map((item) => (
+                      <div key={item.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center">
+                        <div>
+                          <span className="font-medium">{item.name}</span>
+                          <span className="text-muted-foreground text-sm ml-2">
+                            (sold: {item.quantity_sold})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm text-muted-foreground">Qty:</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={inventoryEdits[item.id] || 0}
+                            onChange={(e) => setInventoryEdits({
+                              ...inventoryEdits,
+                              [item.id]: parseInt(e.target.value) || 0
+                            })}
+                            className="w-20 h-8"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Restock or adjust quantities before starting the next day.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-3 pt-2">
               <Button
                 onClick={startDay}
                 className="w-full bg-pink-soft hover:bg-pink-medium text-white py-6 text-lg"
+                disabled={editingInventory}
               >
                 <Play className="w-5 h-5 mr-2" />
                 {isFirstDay ? 'Start Event' : `Start Day ${dayNumber}`}
@@ -407,110 +605,211 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
         </div>
       </div>
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-lg p-4 border">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <DollarSign className="w-4 h-4" />
-            <span className="text-sm">Revenue</span>
-          </div>
-          <p className="text-2xl font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
-        </div>
-        <div className="bg-card rounded-lg p-4 border">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <TrendingUp className="w-4 h-4" />
-            <span className="text-sm">Profit</span>
-          </div>
-          <p className="text-2xl font-bold text-primary">${totalProfit.toFixed(2)}</p>
-        </div>
-        <div className="bg-card rounded-lg p-4 border">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <Package className="w-4 h-4" />
-            <span className="text-sm">Items Sold</span>
-          </div>
-          <p className="text-2xl font-bold">{totalItemsSold} / {totalInventory}</p>
-        </div>
-        <div className="bg-card rounded-lg p-4 border">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <DollarSign className="w-4 h-4" />
-            <span className="text-sm">COGS</span>
-          </div>
-          <p className="text-2xl font-bold text-muted-foreground">${totalCOGS.toFixed(2)}</p>
-        </div>
-      </div>
+      {/* Tabs for Sales and Day Summary */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="sales">
+            <Package className="w-4 h-4 mr-2" />
+            Sales
+          </TabsTrigger>
+          <TabsTrigger value="summary">
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Day Summary
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Items Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {items.map((item) => {
-          const remaining = item.starting_quantity - item.quantity_sold;
-          const itemRevenue = item.price * item.quantity_sold;
-          const soldPercentage = item.starting_quantity > 0 
-            ? (item.quantity_sold / item.starting_quantity) * 100 
-            : 0;
-
-          return (
-            <div key={item.id} className="bg-card rounded-lg p-4 border space-y-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold">{item.name}</h3>
-                  <p className="text-sm text-muted-foreground">${item.price.toFixed(2)} each</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-green-600">${itemRevenue.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">{item.quantity_sold} sold</p>
-                </div>
+        <TabsContent value="sales" className="space-y-6 mt-4">
+          {/* Metrics Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-card rounded-lg p-4 border">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <DollarSign className="w-4 h-4" />
+                <span className="text-sm">Revenue</span>
               </div>
-
-              {/* Progress bar */}
-              <div className="w-full bg-secondary rounded-full h-2">
-                <div
-                  className="bg-pink-soft h-2 rounded-full transition-all"
-                  style={{ width: `${soldPercentage}%` }}
-                />
+              <p className="text-2xl font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
+            </div>
+            <div className="bg-card rounded-lg p-4 border">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <TrendingUp className="w-4 h-4" />
+                <span className="text-sm">Profit</span>
               </div>
+              <p className="text-2xl font-bold text-primary">${totalProfit.toFixed(2)}</p>
+            </div>
+            <div className="bg-card rounded-lg p-4 border">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <Package className="w-4 h-4" />
+                <span className="text-sm">Items Sold</span>
+              </div>
+              <p className="text-2xl font-bold">{totalItemsSold} / {totalInventory}</p>
+            </div>
+            <div className="bg-card rounded-lg p-4 border">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <DollarSign className="w-4 h-4" />
+                <span className="text-sm">COGS</span>
+              </div>
+              <p className="text-2xl font-bold text-muted-foreground">${totalCOGS.toFixed(2)}</p>
+            </div>
+          </div>
 
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{remaining} remaining</span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleQuickRemove(item.id)}
-                    disabled={item.quantity_sold <= 0}
-                  >
-                    <Minus className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => handleQuickSale(item.id)}
-                    disabled={remaining <= 0}
-                    className="bg-pink-soft hover:bg-pink-medium"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      setManualSaleItem(item);
-                      setManualQuantity(1);
-                    }}
-                    disabled={remaining <= 0}
-                  >
-                    +#
-                  </Button>
+          {/* Items Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {items.map((item) => {
+              const remaining = item.starting_quantity - item.quantity_sold;
+              const itemRevenue = item.price * item.quantity_sold;
+              const soldPercentage = item.starting_quantity > 0 
+                ? (item.quantity_sold / item.starting_quantity) * 100 
+                : 0;
+
+              return (
+                <div key={item.id} className="bg-card rounded-lg p-4 border space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold">{item.name}</h3>
+                      <p className="text-sm text-muted-foreground">${item.price.toFixed(2)} each</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-green-600">${itemRevenue.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground">{item.quantity_sold} sold</p>
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full bg-secondary rounded-full h-2">
+                    <div
+                      className="bg-pink-soft h-2 rounded-full transition-all"
+                      style={{ width: `${soldPercentage}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{remaining} remaining</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleQuickRemove(item.id)}
+                        disabled={item.quantity_sold <= 0}
+                      >
+                        <Minus className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleQuickSale(item.id)}
+                        disabled={remaining <= 0}
+                        className="bg-pink-soft hover:bg-pink-medium"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setManualSaleItem(item);
+                          setManualQuantity(1);
+                        }}
+                        disabled={remaining <= 0}
+                      >
+                        +#
+                      </Button>
+                    </div>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+
+          {items.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No items in this event. Go back and add some inventory first.</p>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="summary" className="space-y-6 mt-4">
+          {/* Current Day Summary */}
+          <div className="bg-card rounded-xl border p-6">
+            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+              <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">Current</span>
+              Day {currentDay}
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Open Time</p>
+                <p className="font-medium">
+                  {currentEvent.day_open_time ? format(new Date(currentEvent.day_open_time), 'h:mm a') : '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Revenue</p>
+                <p className="font-medium text-green-600">${totalRevenue.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Items Sold</p>
+                <p className="font-medium">{totalItemsSold}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Profit</p>
+                <p className="font-medium text-primary">${totalProfit.toFixed(2)}</p>
               </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
 
-      {items.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          <p>No items in this event. Go back and add some inventory first.</p>
-        </div>
-      )}
+          {/* Previous Days */}
+          {daySummaries.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Previous Days</h3>
+              {daySummaries.map((day) => (
+                <div key={day.id} className="bg-card rounded-xl border p-6">
+                  <h4 className="font-medium mb-4">Day {day.day_number}</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Open Time</p>
+                      <p className="font-medium">{format(new Date(day.open_time), 'h:mm a')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Close Time</p>
+                      <p className="font-medium">
+                        {day.close_time ? format(new Date(day.close_time), 'h:mm a') : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Revenue</p>
+                      <p className="font-medium text-green-600">${day.revenue.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Items Sold</p>
+                      <p className="font-medium">{day.items_sold}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Event Totals */}
+          <div className="bg-primary/10 rounded-xl border border-primary/20 p-6">
+            <h3 className="font-semibold text-lg mb-4">Event Totals</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Days</p>
+                <p className="font-bold text-xl">{currentDay}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Revenue</p>
+                <p className="font-bold text-xl text-green-600">${(allDaysRevenue + totalRevenue).toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Items Sold</p>
+                <p className="font-bold text-xl">{allDaysItemsSold + totalItemsSold}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Profit</p>
+                <p className="font-bold text-xl text-primary">${totalProfit.toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Manual Sale Dialog */}
       <Dialog open={!!manualSaleItem} onOpenChange={() => setManualSaleItem(null)}>
@@ -584,10 +883,10 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
             <p>Are you sure you want to mark this event as completed? This will end the event permanently.</p>
             <div className="bg-secondary rounded-lg p-4 space-y-2">
               <p><strong>Total Days:</strong> {currentDay}</p>
-              <p><strong>Final Revenue:</strong> ${totalRevenue.toFixed(2)}</p>
+              <p><strong>Final Revenue:</strong> ${(allDaysRevenue + totalRevenue).toFixed(2)}</p>
               <p><strong>Total COGS:</strong> ${totalCOGS.toFixed(2)}</p>
               <p><strong>Net Profit:</strong> ${totalProfit.toFixed(2)}</p>
-              <p><strong>Items Sold:</strong> {totalItemsSold} / {totalInventory}</p>
+              <p><strong>Items Sold:</strong> {allDaysItemsSold + totalItemsSold} / {totalInventory}</p>
             </div>
           </div>
           <DialogFooter>

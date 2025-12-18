@@ -89,6 +89,47 @@ export type Database = {
         }
         Relationships: []
       }
+      event_day_summaries: {
+        Row: {
+          close_time: string | null
+          created_at: string
+          day_number: number
+          event_id: string
+          id: string
+          items_sold: number
+          open_time: string
+          revenue: number
+        }
+        Insert: {
+          close_time?: string | null
+          created_at?: string
+          day_number: number
+          event_id: string
+          id?: string
+          items_sold?: number
+          open_time: string
+          revenue?: number
+        }
+        Update: {
+          close_time?: string | null
+          created_at?: string
+          day_number?: number
+          event_id?: string
+          id?: string
+          items_sold?: number
+          open_time?: string
+          revenue?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_day_summaries_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_items: {
         Row: {
           bake_id: string | null
