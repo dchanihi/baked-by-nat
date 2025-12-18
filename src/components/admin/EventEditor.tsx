@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +68,46 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [saving, setSaving] = useState(false);
   const [showBakeSelector, setShowBakeSelector] = useState(false);
+  
+  // Refs for cell navigation - columns: 0=COGS, 1=Price, 2=Qty
+  const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  
+  const getCellKey = (row: number, col: number) => `${row}-${col}`;
+  
+  const focusCell = useCallback((row: number, col: number) => {
+    const key = getCellKey(row, col);
+    const cell = cellRefs.current.get(key);
+    if (cell) {
+      const focusable = cell.querySelector('[tabindex="0"]') as HTMLElement;
+      focusable?.focus();
+    }
+  }, []);
+  
+  const handleCellNavigate = useCallback((row: number, col: number, direction: 'up' | 'down' | 'left' | 'right') => {
+    let newRow = row;
+    let newCol = col;
+    
+    switch (direction) {
+      case 'up':
+        newRow = Math.max(0, row - 1);
+        break;
+      case 'down':
+        newRow = Math.min(items.length - 1, row + 1);
+        break;
+      case 'left':
+        if (col > 0) {
+          newCol = col - 1;
+        }
+        break;
+      case 'right':
+        if (col < 2) {
+          newCol = col + 1;
+        }
+        break;
+    }
+    
+    setTimeout(() => focusCell(newRow, newCol), 0);
+  }, [items.length, focusCell]);
 
   useEffect(() => {
     loadBakes();
@@ -380,22 +420,43 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                           className="h-8 border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-offset-0"
                         />
                       </div>
-                      <div className="px-2 py-1.5">
+                      <div 
+                        className="px-2 py-1.5"
+                        ref={(el) => {
+                          if (el) cellRefs.current.set(getCellKey(index, 0), el);
+                        }}
+                      >
                         <CurrencyInput
                           value={item.cogs}
                           onChange={(val) => updateItem(index, 'cogs', val)}
+                          onNavigate={(dir) => handleCellNavigate(index, 0, dir)}
+                          onEnter={() => handleCellNavigate(index, 0, 'down')}
                         />
                       </div>
-                      <div className="px-2 py-1.5">
+                      <div 
+                        className="px-2 py-1.5"
+                        ref={(el) => {
+                          if (el) cellRefs.current.set(getCellKey(index, 1), el);
+                        }}
+                      >
                         <CurrencyInput
                           value={item.price}
                           onChange={(val) => updateItem(index, 'price', val)}
+                          onNavigate={(dir) => handleCellNavigate(index, 1, dir)}
+                          onEnter={() => handleCellNavigate(index, 1, 'down')}
                         />
                       </div>
-                      <div className="px-2 py-1.5">
+                      <div 
+                        className="px-2 py-1.5"
+                        ref={(el) => {
+                          if (el) cellRefs.current.set(getCellKey(index, 2), el);
+                        }}
+                      >
                         <NumericInput
                           value={item.starting_quantity}
                           onChange={(val) => updateItem(index, 'starting_quantity', val)}
+                          onNavigate={(dir) => handleCellNavigate(index, 2, dir)}
+                          onEnter={() => handleCellNavigate(index, 2, 'down')}
                         />
                       </div>
                       <div className="px-2 py-1.5 flex justify-center">
