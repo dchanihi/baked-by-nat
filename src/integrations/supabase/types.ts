@@ -133,6 +133,7 @@ export type Database = {
       event_items: {
         Row: {
           bake_id: string | null
+          category: string | null
           cogs: number
           created_at: string
           event_id: string
@@ -145,6 +146,7 @@ export type Database = {
         }
         Insert: {
           bake_id?: string | null
+          category?: string | null
           cogs?: number
           created_at?: string
           event_id: string
@@ -157,6 +159,7 @@ export type Database = {
         }
         Update: {
           bake_id?: string | null
+          category?: string | null
           cogs?: number
           created_at?: string
           event_id?: string

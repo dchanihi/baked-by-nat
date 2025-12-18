@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Trash2, Link } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Link, Cookie, Cake, CakeSlice, Croissant, IceCream, Cherry, Coffee, Candy, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CurrencyInput } from './CurrencyInput';
 import { NumericInput } from './NumericInput';
@@ -26,6 +26,14 @@ import {
 import type { Tables } from '@/integrations/supabase/types';
 
 type Bake = Tables<'bakes'>;
+type Category = Tables<'categories'>;
+
+// Category icon mapping - cycles through available icons
+const categoryIcons = [Cookie, Cake, CakeSlice, Croissant, IceCream, Cherry, Coffee, Candy];
+
+const getCategoryIcon = (index: number) => {
+  return categoryIcons[index % categoryIcons.length];
+};
 
 interface EventItem {
   id?: string;
@@ -34,6 +42,7 @@ interface EventItem {
   cogs: number;
   price: number;
   starting_quantity: number;
+  category: string | null;
 }
 
 interface Event {
@@ -66,6 +75,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
   const [notes, setNotes] = useState(event?.notes || '');
   const [items, setItems] = useState<EventItem[]>([]);
   const [bakes, setBakes] = useState<Bake[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
   const [showBakeSelector, setShowBakeSelector] = useState(false);
   
@@ -164,10 +174,19 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
 
   useEffect(() => {
     loadBakes();
+    loadCategories();
     if (event) {
       loadEventItems();
     }
   }, [event]);
+
+  const loadCategories = async () => {
+    const { data } = await supabase
+      .from('categories')
+      .select('*')
+      .order('display_order', { ascending: true });
+    setCategories(data || []);
+  };
 
   const loadBakes = async () => {
     const { data } = await supabase
@@ -192,6 +211,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
         cogs: Number(item.cogs),
         price: Number(item.price),
         starting_quantity: item.starting_quantity,
+        category: (item as any).category || null,
       })));
     }
   };
@@ -203,6 +223,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
       cogs: 0,
       price: 0,
       starting_quantity: 0,
+      category: null,
     }]);
   };
 
@@ -213,6 +234,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
       cogs: 0,
       price: 0,
       starting_quantity: 0,
+      category: bake.category || null,
     }]);
     setShowBakeSelector(false);
   };
@@ -296,6 +318,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
               cogs: item.cogs,
               price: item.price,
               starting_quantity: item.starting_quantity,
+              category: item.category,
             }))
           );
 
@@ -439,8 +462,9 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
 
           <div className="border rounded-lg overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_100px_100px_80px_48px] bg-muted/50 border-b">
+            <div className="grid grid-cols-[1fr_140px_100px_100px_80px_48px] bg-muted/50 border-b">
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground">Item Name</div>
+              <div className="px-3 py-2 text-xs font-medium text-muted-foreground">Category</div>
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">COGS ($)</div>
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">Price ($)</div>
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-center">Qty</div>
@@ -463,7 +487,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.15, ease: "easeOut" }}
-                      className="grid grid-cols-[1fr_100px_100px_80px_48px] items-center bg-card"
+                      className="grid grid-cols-[1fr_140px_100px_100px_80px_48px] items-center bg-card"
                     >
                       <div className="px-2 py-1.5">
                         <Input
@@ -472,6 +496,45 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                           placeholder="Item name"
                           className="h-8 border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-offset-0"
                         />
+                      </div>
+                      <div className="px-2 py-1.5">
+                        <Select
+                          value={item.category || 'none'}
+                          onValueChange={(val) => updateItem(index, 'category', val === 'none' ? null : val)}
+                        >
+                          <SelectTrigger className="h-8 border-0 bg-transparent focus:ring-1 focus:ring-offset-0">
+                            <SelectValue placeholder="Select">
+                              {item.category ? (
+                                <span className="flex items-center gap-1.5">
+                                  {(() => {
+                                    const catIndex = categories.findIndex(c => c.name === item.category);
+                                    const Icon = catIndex >= 0 ? getCategoryIcon(catIndex) : Package;
+                                    return <Icon className="w-3.5 h-3.5" />;
+                                  })()}
+                                  <span className="truncate">{item.category}</span>
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              <span className="text-muted-foreground">No category</span>
+                            </SelectItem>
+                            {categories.map((cat, catIndex) => {
+                              const Icon = getCategoryIcon(catIndex);
+                              return (
+                                <SelectItem key={cat.id} value={cat.name}>
+                                  <span className="flex items-center gap-2">
+                                    <Icon className="w-4 h-4" />
+                                    {cat.name}
+                                  </span>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div 
                         className="px-2 py-1.5"
