@@ -5,10 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Trash2, Link, Cookie, Cake, CakeSlice, Croissant, IceCream, Cherry, Coffee, Candy, Package, Filter } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Link, Package, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CurrencyInput } from './CurrencyInput';
 import { NumericInput } from './NumericInput';
+import { getIconComponent } from '@/lib/categoryIcons';
 import {
   Select,
   SelectContent,
@@ -26,14 +27,7 @@ import {
 import type { Tables } from '@/integrations/supabase/types';
 
 type Bake = Tables<'bakes'>;
-type Category = Tables<'categories'>;
-
-// Category icon mapping - cycles through available icons
-const categoryIcons = [Cookie, Cake, CakeSlice, Croissant, IceCream, Cherry, Coffee, Candy];
-
-const getCategoryIcon = (index: number) => {
-  return categoryIcons[index % categoryIcons.length];
-};
+type Category = Tables<'categories'> & { icon?: string | null };
 
 interface EventItem {
   id?: string;
@@ -486,8 +480,8 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                 <Package className="w-3 h-3" />
                 Uncategorized ({items.filter(i => !i.category).length})
               </button>
-              {categories.map((cat, catIndex) => {
-                const Icon = getCategoryIcon(catIndex);
+              {categories.map((cat) => {
+                const Icon = getIconComponent(cat.icon);
                 const count = items.filter(i => i.category === cat.name).length;
                 if (count === 0) return null;
                 return (
@@ -562,8 +556,8 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                               {item.category ? (
                                 <span className="flex items-center gap-1.5">
                                   {(() => {
-                                    const catIndex = categories.findIndex(c => c.name === item.category);
-                                    const Icon = catIndex >= 0 ? getCategoryIcon(catIndex) : Package;
+                                    const cat = categories.find(c => c.name === item.category);
+                                    const Icon = getIconComponent(cat?.icon);
                                     return <Icon className="w-3.5 h-3.5" />;
                                   })()}
                                   <span className="truncate">{item.category}</span>
@@ -577,8 +571,8 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                             <SelectItem value="none">
                               <span className="text-muted-foreground">No category</span>
                             </SelectItem>
-                            {categories.map((cat, catIndex) => {
-                              const Icon = getCategoryIcon(catIndex);
+                            {categories.map((cat) => {
+                              const Icon = getIconComponent(cat.icon);
                               return (
                                 <SelectItem key={cat.id} value={cat.name}>
                                   <span className="flex items-center gap-2">

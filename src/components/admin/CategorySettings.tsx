@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Trash2, GripVertical, Pencil, Check, X } from 'lucide-react';
+import { CATEGORY_ICONS, getIconComponent } from '@/lib/categoryIcons';
 import type { Tables } from '@/integrations/supabase/types';
 import {
   Dialog,
@@ -22,6 +23,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   DndContext,
   closestCenter,
@@ -40,7 +46,50 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-type Category = Tables<'categories'>;
+type Category = Tables<'categories'> & { icon?: string | null };
+
+const IconSelector = ({ 
+  value, 
+  onChange 
+}: { 
+  value: string; 
+  onChange: (value: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const CurrentIcon = getIconComponent(value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="icon" className="shrink-0">
+          <CurrentIcon className="w-4 h-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-2" align="start">
+        <div className="grid grid-cols-6 gap-1">
+          {CATEGORY_ICONS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Button
+                key={item.name}
+                variant={value === item.name ? "default" : "ghost"}
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => {
+                  onChange(item.name);
+                  setOpen(false);
+                }}
+                title={item.label}
+              >
+                <Icon className="w-5 h-5" />
+              </Button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 const SortableCategory = ({ 
   category, 
@@ -48,16 +97,20 @@ const SortableCategory = ({
   onEdit, 
   isEditing, 
   editValue, 
+  editIcon,
   onEditChange, 
+  onIconChange,
   onSaveEdit, 
   onCancelEdit 
 }: { 
   category: Category; 
   onDelete: (id: string, name: string) => void;
-  onEdit: (id: string, name: string) => void;
+  onEdit: (id: string, name: string, icon: string) => void;
   isEditing: boolean;
   editValue: string;
+  editIcon: string;
   onEditChange: (value: string) => void;
+  onIconChange: (value: string) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
 }) => {
@@ -74,6 +127,8 @@ const SortableCategory = ({
     transition,
   };
 
+  const CategoryIcon = getIconComponent(category.icon);
+
   return (
     <div
       ref={setNodeRef}
@@ -85,6 +140,7 @@ const SortableCategory = ({
       </div>
       {isEditing ? (
         <>
+          <IconSelector value={editIcon} onChange={onIconChange} />
           <Input
             value={editValue}
             onChange={(e) => onEditChange(e.target.value)}
@@ -114,11 +170,12 @@ const SortableCategory = ({
         </>
       ) : (
         <>
+          <CategoryIcon className="w-5 h-5 text-primary" />
           <span className="flex-1 font-medium">{category.name}</span>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onEdit(category.id, category.name)}
+            onClick={() => onEdit(category.id, category.name, category.icon || 'cookie')}
             className="text-muted-foreground hover:text-foreground"
           >
             <Pencil className="w-4 h-4" />
@@ -146,9 +203,11 @@ export const CategorySettings = () => {
   );
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategory, setNewCategory] = useState('');
+  const [newCategoryIcon, setNewCategoryIcon] = useState('cookie');
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [editIcon, setEditIcon] = useState('cookie');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
   const [replacementCategoryId, setReplacementCategoryId] = useState<string>('');
@@ -186,7 +245,8 @@ export const CategorySettings = () => {
       .from('categories')
       .insert({ 
         name: newCategory.trim(),
-        display_order: maxOrder + 1
+        display_order: maxOrder + 1,
+        icon: newCategoryIcon
       });
 
     setLoading(false);
@@ -203,6 +263,7 @@ export const CategorySettings = () => {
         description: 'Category added successfully.',
       });
       setNewCategory('');
+      setNewCategoryIcon('cookie');
       loadCategories();
     }
   };
@@ -299,9 +360,10 @@ export const CategorySettings = () => {
     }
   };
 
-  const handleEdit = (id: string, name: string) => {
+  const handleEdit = (id: string, name: string, icon: string) => {
     setEditingId(id);
     setEditValue(name);
+    setEditIcon(icon);
   };
 
   const handleSaveEdit = async () => {
@@ -309,7 +371,7 @@ export const CategorySettings = () => {
 
     const { error } = await supabase
       .from('categories')
-      .update({ name: editValue.trim() })
+      .update({ name: editValue.trim(), icon: editIcon })
       .eq('id', editingId);
 
     if (error) {
@@ -325,6 +387,7 @@ export const CategorySettings = () => {
       });
       setEditingId(null);
       setEditValue('');
+      setEditIcon('cookie');
       loadCategories();
     }
   };
@@ -332,6 +395,7 @@ export const CategorySettings = () => {
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditValue('');
+    setEditIcon('cookie');
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -390,12 +454,14 @@ export const CategorySettings = () => {
         <div className="space-y-2">
           <Label htmlFor="new-category">Add New Category</Label>
           <div className="flex gap-2">
+            <IconSelector value={newCategoryIcon} onChange={setNewCategoryIcon} />
             <Input
               id="new-category"
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
               placeholder="e.g., Macarons"
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              className="flex-1"
             />
             <Button 
               onClick={handleAdd}
@@ -434,7 +500,9 @@ export const CategorySettings = () => {
                       onEdit={handleEdit}
                       isEditing={editingId === category.id}
                       editValue={editValue}
+                      editIcon={editIcon}
                       onEditChange={setEditValue}
+                      onIconChange={setEditIcon}
                       onSaveEdit={handleSaveEdit}
                       onCancelEdit={handleCancelEdit}
                     />
@@ -469,11 +537,17 @@ export const CategorySettings = () => {
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
-                {availableReplacementCategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
+                {availableReplacementCategories.map((cat) => {
+                  const CatIcon = getIconComponent(cat.icon);
+                  return (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      <div className="flex items-center gap-2">
+                        <CatIcon className="w-4 h-4" />
+                        {cat.name}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -498,11 +572,11 @@ export const CategorySettings = () => {
             Delete Without Reassignment
           </Button>
           <Button
-            variant="destructive"
             onClick={handleConfirmDelete}
             disabled={availableReplacementCategories.length > 0 && !replacementCategoryId}
+            className="bg-pink-soft hover:bg-pink-medium"
           >
-            Confirm & Reassign
+            Confirm & Delete
           </Button>
         </DialogFooter>
       </DialogContent>
