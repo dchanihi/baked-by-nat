@@ -6,20 +6,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
 import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 interface EventItem {
   id: string;
   name: string;
@@ -28,7 +16,6 @@ interface EventItem {
   starting_quantity: number;
   quantity_sold: number;
 }
-
 interface Event {
   id: string;
   name: string;
@@ -41,7 +28,6 @@ interface Event {
   day_open_time?: string | null;
   day_close_time?: string | null;
 }
-
 interface DaySummary {
   id: string;
   day_number: number;
@@ -50,14 +36,16 @@ interface DaySummary {
   revenue: number;
   items_sold: number;
 }
-
 interface EventRunnerProps {
   event: Event;
   onBack: () => void;
   onUpdate: () => void;
 }
-
-export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
+export const EventRunner = ({
+  event,
+  onBack,
+  onUpdate
+}: EventRunnerProps) => {
   const [items, setItems] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [manualSaleItem, setManualSaleItem] = useState<EventItem | null>(null);
@@ -74,20 +62,16 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
   // Determine if we need to show the start confirmation
   const isDayActive = currentEvent.day_open_time && !currentEvent.day_close_time;
   const currentDay = currentEvent.current_day || 0;
-
   useEffect(() => {
     loadItems();
     loadEventDetails();
     loadDaySummaries();
   }, [event.id]);
-
   const loadEventDetails = async () => {
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .eq('id', event.id)
-      .maybeSingle();
-
+    const {
+      data,
+      error
+    } = await supabase.from('events').select('*').eq('id', event.id).maybeSingle();
     if (data) {
       setCurrentEvent(data as Event);
       // Show start confirmation if day isn't active
@@ -96,18 +80,16 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
       }
     }
   };
-
   const loadItems = async () => {
-    const { data, error } = await supabase
-      .from('event_items')
-      .select('*')
-      .eq('event_id', event.id);
-
+    const {
+      data,
+      error
+    } = await supabase.from('event_items').select('*').eq('event_id', event.id);
     if (error) {
       toast({
         title: 'Error',
         description: 'Failed to load items.',
-        variant: 'destructive',
+        variant: 'destructive'
       });
     } else {
       const loadedItems = data?.map(item => ({
@@ -116,7 +98,7 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
         cogs: Number(item.cogs),
         price: Number(item.price),
         starting_quantity: item.starting_quantity,
-        quantity_sold: item.quantity_sold,
+        quantity_sold: item.quantity_sold
       })) || [];
       setItems(loadedItems);
       // Initialize inventory edits
@@ -128,14 +110,13 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
     }
     setLoading(false);
   };
-
   const loadDaySummaries = async () => {
-    const { data, error } = await supabase
-      .from('event_day_summaries')
-      .select('*')
-      .eq('event_id', event.id)
-      .order('day_number', { ascending: true });
-
+    const {
+      data,
+      error
+    } = await supabase.from('event_day_summaries').select('*').eq('event_id', event.id).order('day_number', {
+      ascending: true
+    });
     if (!error && data) {
       setDaySummaries(data.map(d => ({
         id: d.id,
@@ -143,51 +124,44 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
         open_time: d.open_time,
         close_time: d.close_time,
         revenue: Number(d.revenue),
-        items_sold: d.items_sold,
+        items_sold: d.items_sold
       })));
     }
   };
-
   const startDay = async () => {
     const newDay = (currentEvent.current_day || 0) + 1;
     const openTime = new Date().toISOString();
-
-    const { error } = await supabase
-      .from('events')
-      .update({
-        status: 'active',
-        current_day: newDay,
-        day_open_time: openTime,
-        day_close_time: null,
-      })
-      .eq('id', event.id);
-
+    const {
+      error
+    } = await supabase.from('events').update({
+      status: 'active',
+      current_day: newDay,
+      day_open_time: openTime,
+      day_close_time: null
+    }).eq('id', event.id);
     if (error) {
       toast({
         title: 'Error',
         description: 'Failed to start the day.',
-        variant: 'destructive',
+        variant: 'destructive'
       });
       return;
     }
-
     setCurrentEvent({
       ...currentEvent,
       status: 'active',
       current_day: newDay,
       day_open_time: openTime,
-      day_close_time: null,
+      day_close_time: null
     });
     setShowStartConfirm(false);
     setEditingInventory(false);
     onUpdate();
-
     toast({
       title: `Day ${newDay} Started`,
-      description: `Event opened at ${format(new Date(openTime), 'h:mm a')}`,
+      description: `Event opened at ${format(new Date(openTime), 'h:mm a')}`
     });
   };
-
   const endDay = async () => {
     const closeTime = new Date().toISOString();
 
@@ -202,144 +176,118 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
       open_time: currentEvent.day_open_time!,
       close_time: closeTime,
       revenue: dayRevenue,
-      items_sold: dayItemsSold,
+      items_sold: dayItemsSold
     });
-
-    const { error } = await supabase
-      .from('events')
-      .update({
-        day_close_time: closeTime,
-      })
-      .eq('id', event.id);
-
+    const {
+      error
+    } = await supabase.from('events').update({
+      day_close_time: closeTime
+    }).eq('id', event.id);
     if (error) {
       toast({
         title: 'Error',
         description: 'Failed to end the day.',
-        variant: 'destructive',
+        variant: 'destructive'
       });
       return;
     }
-
     setCurrentEvent({
       ...currentEvent,
-      day_close_time: closeTime,
+      day_close_time: closeTime
     });
     setShowEndDayDialog(false);
     setShowStartConfirm(true);
     loadDaySummaries();
     onUpdate();
-
     toast({
       title: `Day ${currentDay} Ended`,
-      description: `Event closed at ${format(new Date(closeTime), 'h:mm a')}`,
+      description: `Event closed at ${format(new Date(closeTime), 'h:mm a')}`
     });
   };
-
   const saveInventoryEdits = async () => {
     const updates = Object.entries(inventoryEdits).map(([id, quantity]) => ({
       id,
-      starting_quantity: quantity,
+      starting_quantity: quantity
     }));
-
     for (const update of updates) {
-      await supabase
-        .from('event_items')
-        .update({ starting_quantity: update.starting_quantity })
-        .eq('id', update.id);
+      await supabase.from('event_items').update({
+        starting_quantity: update.starting_quantity
+      }).eq('id', update.id);
     }
-
     await loadItems();
     setEditingInventory(false);
-
     toast({
       title: 'Inventory Updated',
-      description: 'Starting quantities have been updated for the next day.',
+      description: 'Starting quantities have been updated for the next day.'
     });
   };
-
   const recordSale = async (itemId: string, quantity: number) => {
     const item = items.find(i => i.id === itemId);
     if (!item) return;
-
     const remaining = item.starting_quantity - item.quantity_sold;
     if (quantity > remaining) {
       toast({
         title: 'Not enough inventory',
         description: `Only ${remaining} left in stock.`,
-        variant: 'destructive',
+        variant: 'destructive'
       });
       return;
     }
-
     const newQuantitySold = item.quantity_sold + quantity;
-
-    setItems(items.map(i =>
-      i.id === itemId ? { ...i, quantity_sold: newQuantitySold } : i
-    ));
-
-    const { error: updateError } = await supabase
-      .from('event_items')
-      .update({ quantity_sold: newQuantitySold })
-      .eq('id', itemId);
-
+    setItems(items.map(i => i.id === itemId ? {
+      ...i,
+      quantity_sold: newQuantitySold
+    } : i));
+    const {
+      error: updateError
+    } = await supabase.from('event_items').update({
+      quantity_sold: newQuantitySold
+    }).eq('id', itemId);
     if (updateError) {
       toast({
         title: 'Error',
         description: 'Failed to update inventory.',
-        variant: 'destructive',
+        variant: 'destructive'
       });
       loadItems();
       return;
     }
-
     await supabase.from('event_sales').insert({
       event_item_id: itemId,
       quantity,
       unit_price: item.price,
-      total_price: item.price * quantity,
+      total_price: item.price * quantity
     });
   };
-
   const handleQuickSale = (itemId: string) => {
     recordSale(itemId, 1);
   };
-
   const handleQuickRemove = async (itemId: string) => {
     const item = items.find(i => i.id === itemId);
     if (!item || item.quantity_sold <= 0) return;
-
     const newQuantitySold = item.quantity_sold - 1;
-
-    setItems(items.map(i =>
-      i.id === itemId ? { ...i, quantity_sold: newQuantitySold } : i
-    ));
-
-    await supabase
-      .from('event_items')
-      .update({ quantity_sold: newQuantitySold })
-      .eq('id', itemId);
-
-    const { data: recentSale } = await supabase
-      .from('event_sales')
-      .select('id')
-      .eq('event_item_id', itemId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
+    setItems(items.map(i => i.id === itemId ? {
+      ...i,
+      quantity_sold: newQuantitySold
+    } : i));
+    await supabase.from('event_items').update({
+      quantity_sold: newQuantitySold
+    }).eq('id', itemId);
+    const {
+      data: recentSale
+    } = await supabase.from('event_sales').select('id').eq('event_item_id', itemId).order('created_at', {
+      ascending: false
+    }).limit(1).maybeSingle();
     if (recentSale) {
       await supabase.from('event_sales').delete().eq('id', recentSale.id);
     }
   };
-
   const handleManualSale = () => {
     if (!manualSaleItem || manualQuantity <= 0) return;
     recordSale(manualSaleItem.id, manualQuantity);
     setManualSaleItem(null);
     setManualQuantity(1);
   };
-
   const completeEvent = async () => {
     const closeTime = new Date().toISOString();
 
@@ -351,21 +299,16 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
         open_time: currentEvent.day_open_time!,
         close_time: closeTime,
         revenue: totalRevenue,
-        items_sold: totalItemsSold,
+        items_sold: totalItemsSold
       });
     }
-
-    await supabase
-      .from('events')
-      .update({
-        status: 'completed',
-        day_close_time: closeTime,
-      })
-      .eq('id', event.id);
-    
+    await supabase.from('events').update({
+      status: 'completed',
+      day_close_time: closeTime
+    }).eq('id', event.id);
     toast({
       title: 'Event Completed',
-      description: 'The event has been marked as completed.',
+      description: 'The event has been marked as completed.'
     });
     setShowCompleteDialog(false);
     onUpdate();
@@ -373,8 +316,8 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
   };
 
   // Calculate metrics
-  const totalRevenue = items.reduce((sum, item) => sum + (item.price * item.quantity_sold), 0);
-  const totalCOGS = items.reduce((sum, item) => sum + (item.cogs * item.quantity_sold), 0);
+  const totalRevenue = items.reduce((sum, item) => sum + item.price * item.quantity_sold, 0);
+  const totalCOGS = items.reduce((sum, item) => sum + item.cogs * item.quantity_sold, 0);
   const totalProfit = totalRevenue - totalCOGS;
   const totalItemsSold = items.reduce((sum, item) => sum + item.quantity_sold, 0);
   const totalInventory = items.reduce((sum, item) => sum + item.starting_quantity, 0);
@@ -382,22 +325,17 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
   // Calculate totals from all day summaries
   const allDaysRevenue = daySummaries.reduce((sum, d) => sum + d.revenue, 0);
   const allDaysItemsSold = daySummaries.reduce((sum, d) => sum + d.items_sold, 0);
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
+    return <div className="flex items-center justify-center py-12">
         <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
+      </div>;
   }
 
   // Start Confirmation Screen (with inventory editing for multi-day events)
   if (showStartConfirm) {
     const isFirstDay = currentDay === 0;
     const dayNumber = currentDay + 1;
-
-    return (
-      <div className="space-y-6">
+    return <div className="space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={onBack}>
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -425,9 +363,7 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
               <div className="flex items-center gap-2 text-sm">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span className="font-medium">Day {dayNumber}</span>
-                {!isFirstDay && (
-                  <span className="text-muted-foreground">(Multi-day event)</span>
-                )}
+                {!isFirstDay && <span className="text-muted-foreground">(Multi-day event)</span>}
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="w-4 h-4" />
@@ -439,21 +375,17 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
               </div>
             </div>
 
-            {!isFirstDay && currentEvent.day_close_time && (
-              <div className="bg-muted rounded-lg p-3 text-sm text-muted-foreground">
+            {!isFirstDay && currentEvent.day_close_time && <div className="bg-muted rounded-lg p-3 text-sm text-muted-foreground">
                 <p>Day {currentDay} ended at {format(new Date(currentEvent.day_close_time), 'h:mm a')}</p>
-              </div>
-            )}
+              </div>}
 
             {/* Day Summaries Section */}
-            {daySummaries.length > 0 && (
-              <div className="space-y-3">
+            {daySummaries.length > 0 && <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-sm">Previous Days Summary</h3>
                 </div>
                 <div className="space-y-2">
-                  {daySummaries.map((day) => (
-                    <div key={day.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center text-sm">
+                  {daySummaries.map(day => <div key={day.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center text-sm">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Day {day.day_number}</span>
                         <span className="text-muted-foreground">
@@ -464,8 +396,7 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
                         <span className="text-muted-foreground">{day.items_sold} sold</span>
                         <span className="font-medium text-green-600">${day.revenue.toFixed(2)}</span>
                       </div>
-                    </div>
-                  ))}
+                    </div>)}
                   <div className="bg-primary/10 rounded-lg p-3 flex justify-between items-center text-sm font-medium">
                     <span>Total from previous days</span>
                     <div className="flex items-center gap-4">
@@ -474,42 +405,34 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              </div>}
 
             {/* Inventory Editing (for multi-day events) */}
-            {!isFirstDay && (
-              <div className="space-y-3">
+            {!isFirstDay && <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-sm">Adjust Inventory for Day {dayNumber}</h3>
-                  {!editingInventory ? (
-                    <Button variant="outline" size="sm" onClick={() => setEditingInventory(true)}>
+                  {!editingInventory ? <Button variant="outline" size="sm" onClick={() => setEditingInventory(true)}>
                       <Edit2 className="w-4 h-4 mr-1" />
                       Edit Quantities
-                    </Button>
-                  ) : (
-                    <div className="flex gap-2">
+                    </Button> : <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => {
-                        setEditingInventory(false);
-                        const edits: Record<string, number> = {};
-                        items.forEach(item => {
-                          edits[item.id] = item.starting_quantity;
-                        });
-                        setInventoryEdits(edits);
-                      }}>
+                  setEditingInventory(false);
+                  const edits: Record<string, number> = {};
+                  items.forEach(item => {
+                    edits[item.id] = item.starting_quantity;
+                  });
+                  setInventoryEdits(edits);
+                }}>
                         Cancel
                       </Button>
                       <Button size="sm" onClick={saveInventoryEdits} className="bg-pink-soft hover:bg-pink-medium">
                         Save Changes
                       </Button>
-                    </div>
-                  )}
+                    </div>}
                 </div>
                 
-                {editingInventory ? (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {items.map((item) => (
-                      <div key={item.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center">
+                {editingInventory ? <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {items.map(item => <div key={item.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center">
                         <div>
                           <span className="font-medium">{item.name}</span>
                           <span className="text-muted-foreground text-sm ml-2">
@@ -518,53 +441,31 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
                         </div>
                         <div className="flex items-center gap-2">
                           <Label className="text-sm text-muted-foreground">Qty:</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={inventoryEdits[item.id] || 0}
-                            onChange={(e) => setInventoryEdits({
-                              ...inventoryEdits,
-                              [item.id]: parseInt(e.target.value) || 0
-                            })}
-                            className="w-20 h-8"
-                          />
+                          <Input type="number" min="0" value={inventoryEdits[item.id] || 0} onChange={e => setInventoryEdits({
+                    ...inventoryEdits,
+                    [item.id]: parseInt(e.target.value) || 0
+                  })} className="w-20 h-8" />
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
+                      </div>)}
+                  </div> : <p className="text-sm text-muted-foreground">
                     Restock or adjust quantities before starting the next day.
-                  </p>
-                )}
-              </div>
-            )}
+                  </p>}
+              </div>}
 
             <div className="space-y-3 pt-2">
-              <Button
-                onClick={startDay}
-                className="w-full bg-pink-soft hover:bg-pink-medium text-white py-6 text-lg"
-                disabled={editingInventory}
-              >
+              <Button onClick={startDay} className="w-full bg-pink-soft hover:bg-pink-medium text-white py-6 text-lg" disabled={editingInventory}>
                 <Play className="w-5 h-5 mr-2" />
                 {isFirstDay ? 'Start Event' : `Start Day ${dayNumber}`}
               </Button>
-              <Button
-                variant="outline"
-                onClick={onBack}
-                className="w-full"
-              >
+              <Button variant="outline" onClick={onBack} className="w-full">
                 Cancel
               </Button>
             </div>
           </div>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={onBack}>
@@ -579,26 +480,17 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              {currentEvent.day_open_time && (
-                <>Opened at {format(new Date(currentEvent.day_open_time), 'h:mm a')} • </>
-              )}
+              {currentEvent.day_open_time && <>Opened at {format(new Date(currentEvent.day_open_time), 'h:mm a')} • </>}
               {event.location && `${event.location}`}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button
-            onClick={() => setShowEndDayDialog(true)}
-            variant="outline"
-          >
+          <Button onClick={() => setShowEndDayDialog(true)} variant="outline">
             <Clock className="w-4 h-4 mr-2" />
             End Day {currentDay}
           </Button>
-          <Button
-            onClick={() => setShowCompleteDialog(true)}
-            variant="outline"
-            className="text-green-600 hover:text-green-700"
-          >
+          <Button onClick={() => setShowCompleteDialog(true)} variant="outline" className="text-green-600 hover:text-green-700">
             <CheckCircle className="w-4 h-4 mr-2" />
             Complete Event
           </Button>
@@ -633,14 +525,14 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
                 <DollarSign className="w-4 h-4" />
                 <span className="text-sm">Revenue</span>
               </div>
-              <p className="text-2xl font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-sidebar-primary">${totalRevenue.toFixed(2)}</p>
             </div>
             <div className="bg-card rounded-lg p-4 border">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <TrendingUp className="w-4 h-4" />
                 <span className="text-sm">Profit</span>
               </div>
-              <p className="text-2xl font-bold text-primary">${totalProfit.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-[#2ba14a]">${totalProfit.toFixed(2)}</p>
             </div>
             <div className="bg-card rounded-lg p-4 border">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -653,15 +545,11 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
 
           {/* Items Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((item) => {
-              const remaining = item.starting_quantity - item.quantity_sold;
-              const itemRevenue = item.price * item.quantity_sold;
-              const soldPercentage = item.starting_quantity > 0 
-                ? (item.quantity_sold / item.starting_quantity) * 100 
-                : 0;
-
-              return (
-                <div key={item.id} className="bg-card rounded-lg p-4 border space-y-3">
+            {items.map(item => {
+            const remaining = item.starting_quantity - item.quantity_sold;
+            const itemRevenue = item.price * item.quantity_sold;
+            const soldPercentage = item.starting_quantity > 0 ? item.quantity_sold / item.starting_quantity * 100 : 0;
+            return <div key={item.id} className="bg-card rounded-lg p-4 border space-y-3">
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold">{item.name}</h3>
@@ -675,54 +563,35 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
 
                   {/* Progress bar */}
                   <div className="w-full bg-secondary rounded-full h-2">
-                    <div
-                      className="bg-pink-soft h-2 rounded-full transition-all"
-                      style={{ width: `${soldPercentage}%` }}
-                    />
+                    <div className="bg-pink-soft h-2 rounded-full transition-all" style={{
+                  width: `${soldPercentage}%`
+                }} />
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{remaining} remaining</span>
                     <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleQuickRemove(item.id)}
-                        disabled={item.quantity_sold <= 0}
-                      >
+                      <Button size="sm" variant="outline" onClick={() => handleQuickRemove(item.id)} disabled={item.quantity_sold <= 0}>
                         <Minus className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleQuickSale(item.id)}
-                        disabled={remaining <= 0}
-                        className="bg-pink-soft hover:bg-pink-medium"
-                      >
+                      <Button size="sm" onClick={() => handleQuickSale(item.id)} disabled={remaining <= 0} className="bg-pink-soft hover:bg-pink-medium">
                         <Plus className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setManualSaleItem(item);
-                          setManualQuantity(1);
-                        }}
-                        disabled={remaining <= 0}
-                      >
+                      <Button size="sm" variant="secondary" onClick={() => {
+                    setManualSaleItem(item);
+                    setManualQuantity(1);
+                  }} disabled={remaining <= 0}>
                         +#
                       </Button>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                </div>;
+          })}
           </div>
 
-          {items.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
+          {items.length === 0 && <div className="text-center py-12 text-muted-foreground">
               <p>No items in this event. Go back and add some inventory first.</p>
-            </div>
-          )}
+            </div>}
         </TabsContent>
 
         <TabsContent value="summary" className="space-y-6 mt-4">
@@ -755,11 +624,9 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
           </div>
 
           {/* Previous Days */}
-          {daySummaries.length > 0 && (
-            <div className="space-y-4">
+          {daySummaries.length > 0 && <div className="space-y-4">
               <h3 className="font-semibold text-lg">Previous Days</h3>
-              {daySummaries.map((day) => (
-                <div key={day.id} className="bg-card rounded-xl border p-6">
+              {daySummaries.map(day => <div key={day.id} className="bg-card rounded-xl border p-6">
                   <h4 className="font-medium mb-4">Day {day.day_number}</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
@@ -781,10 +648,8 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
                       <p className="font-medium">{day.items_sold}</p>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                </div>)}
+            </div>}
 
           {/* Event Totals */}
           <div className="bg-primary/10 rounded-xl border border-primary/20 p-6">
@@ -820,19 +685,11 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Quantity</Label>
-              <Input
-                type="number"
-                min="1"
-                max={manualSaleItem ? manualSaleItem.starting_quantity - manualSaleItem.quantity_sold : 1}
-                value={manualQuantity}
-                onChange={(e) => setManualQuantity(parseInt(e.target.value) || 1)}
-              />
+              <Input type="number" min="1" max={manualSaleItem ? manualSaleItem.starting_quantity - manualSaleItem.quantity_sold : 1} value={manualQuantity} onChange={e => setManualQuantity(parseInt(e.target.value) || 1)} />
             </div>
-            {manualSaleItem && (
-              <p className="text-sm text-muted-foreground">
+            {manualSaleItem && <p className="text-sm text-muted-foreground">
                 Total: ${(manualSaleItem.price * manualQuantity).toFixed(2)}
-              </p>
-            )}
+              </p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setManualSaleItem(null)}>
@@ -854,9 +711,7 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
           <div className="space-y-4 py-4">
             <p>Are you sure you want to end Day {currentDay}? You can start a new day afterwards for multi-day events.</p>
             <div className="bg-secondary rounded-lg p-4 space-y-2">
-              {currentEvent.day_open_time && (
-                <p><strong>Opened at:</strong> {format(new Date(currentEvent.day_open_time), 'h:mm a')}</p>
-              )}
+              {currentEvent.day_open_time && <p><strong>Opened at:</strong> {format(new Date(currentEvent.day_open_time), 'h:mm a')}</p>}
               <p><strong>Closing at:</strong> {format(new Date(), 'h:mm a')}</p>
               <p><strong>Today's Revenue:</strong> ${totalRevenue.toFixed(2)}</p>
               <p><strong>Items Sold:</strong> {totalItemsSold}</p>
@@ -899,6 +754,5 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
+    </div>;
 };
