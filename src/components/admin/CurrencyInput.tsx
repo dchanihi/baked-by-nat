@@ -8,9 +8,10 @@ interface CurrencyInputProps {
   className?: string;
   onNavigate?: (direction: 'up' | 'down' | 'left' | 'right') => void;
   onEnter?: () => void;
+  onFocus?: () => void;
 }
 
-export const CurrencyInput = ({ value, onChange, className, onNavigate, onEnter }: CurrencyInputProps) => {
+export const CurrencyInput = ({ value, onChange, className, onNavigate, onEnter, onFocus }: CurrencyInputProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isSelected, setIsSelected] = useState(false);
   const [tempValue, setTempValue] = useState('');
@@ -23,6 +24,7 @@ export const CurrencyInput = ({ value, onChange, className, onNavigate, onEnter 
   };
 
   const handleClick = () => {
+    onFocus?.();
     if (value === 0) {
       enterEditMode();
     } else {
@@ -31,6 +33,7 @@ export const CurrencyInput = ({ value, onChange, className, onNavigate, onEnter 
   };
 
   const handleDoubleClick = () => {
+    onFocus?.();
     enterEditMode();
   };
 
