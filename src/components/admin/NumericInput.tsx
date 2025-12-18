@@ -2,13 +2,14 @@ import { useState, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-interface CurrencyInputProps {
+interface NumericInputProps {
   value: number;
   onChange: (value: number) => void;
   className?: string;
+  min?: number;
 }
 
-export const CurrencyInput = ({ value, onChange, className }: CurrencyInputProps) => {
+export const NumericInput = ({ value, onChange, className, min = 0 }: NumericInputProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isSelected, setIsSelected] = useState(false);
   const [tempValue, setTempValue] = useState('');
@@ -35,7 +36,7 @@ export const CurrencyInput = ({ value, onChange, className }: CurrencyInputProps
   const handleBlur = () => {
     setIsFocused(false);
     setIsSelected(false);
-    const parsed = parseFloat(tempValue) || 0;
+    const parsed = parseInt(tempValue) || 0;
     onChange(parsed);
   };
 
@@ -43,25 +44,18 @@ export const CurrencyInput = ({ value, onChange, className }: CurrencyInputProps
     setTempValue(e.target.value);
   };
 
-  const formattedValue = value.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  });
-
   return (
     <div className="relative">
       {isFocused ? (
         <Input
           ref={inputRef}
           type="number"
-          step="0.01"
-          min="0"
+          min={min}
           value={tempValue}
           onChange={handleChange}
           onBlur={handleBlur}
           autoFocus
-          className={cn("h-8 border-0 bg-transparent text-right focus-visible:ring-1 focus-visible:ring-offset-0", className)}
+          className={cn("h-8 border-0 bg-transparent text-center focus-visible:ring-1 focus-visible:ring-offset-0", className)}
         />
       ) : (
         <div
@@ -70,12 +64,12 @@ export const CurrencyInput = ({ value, onChange, className }: CurrencyInputProps
           onBlur={() => setIsSelected(false)}
           tabIndex={0}
           className={cn(
-            "h-8 px-3 flex items-center justify-end text-sm cursor-text rounded-md transition-colors select-all",
+            "h-8 px-3 flex items-center justify-center text-sm cursor-text rounded-md transition-colors select-all",
             isSelected ? "bg-primary/20 ring-2 ring-primary/50" : "hover:bg-muted/50",
             className
           )}
         >
-          {formattedValue}
+          {value}
         </div>
       )}
     </div>
