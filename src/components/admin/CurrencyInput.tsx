@@ -103,8 +103,10 @@ export const CurrencyInput = ({ value, onChange, className, onNavigate, onEnter,
         setIsSelected(false);
         onNavigate?.('right');
       } else if (/^[0-9.]$/.test(e.key)) {
-        enterEditMode();
+        e.preventDefault();
         setTempValue(e.key);
+        setIsFocused(true);
+        setIsSelected(false);
       }
     }
   };
