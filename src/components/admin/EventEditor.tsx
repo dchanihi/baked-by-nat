@@ -342,75 +342,87 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
             </div>
           </div>
 
-          {items.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">
-              No items added yet. Add items from your catalog or create custom items.
-            </p>
-          ) : (
-            <div className="space-y-3 flex flex-col">
-              <AnimatePresence mode="popLayout">
-                {items.map((item, index) => (
-                  <motion.div
-                    key={item.id || `new-${index}`}
-                    layout
-                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                    className="grid grid-cols-12 gap-2 items-end p-3 bg-secondary rounded-lg"
-                  >
-                    <div className="col-span-12 md:col-span-4 space-y-1">
-                      <Label className="text-xs">Item Name</Label>
-                      <Input
-                        value={item.name}
-                        onChange={(e) => updateItem(index, 'name', e.target.value)}
-                        placeholder="Item name"
-                      />
-                    </div>
-                    <div className="col-span-6 md:col-span-2 space-y-1">
-                      <Label className="text-xs">COGS ($)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.cogs}
-                        onChange={(e) => updateItem(index, 'cogs', parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-                    <div className="col-span-6 md:col-span-2 space-y-1">
-                      <Label className="text-xs">Price ($)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.price}
-                        onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-                    <div className="col-span-6 md:col-span-2 space-y-1">
-                      <Label className="text-xs">Qty</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={item.starting_quantity}
-                        onChange={(e) => updateItem(index, 'starting_quantity', parseInt(e.target.value) || 0)}
-                      />
-                    </div>
-                    <div className="col-span-6 md:col-span-2 flex justify-end">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeItem(index)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+          <div className="border rounded-lg overflow-hidden">
+            {/* Table Header */}
+            <div className="grid grid-cols-[1fr_100px_100px_80px_48px] bg-muted/50 border-b">
+              <div className="px-3 py-2 text-xs font-medium text-muted-foreground">Item Name</div>
+              <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">COGS ($)</div>
+              <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">Price ($)</div>
+              <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">Qty</div>
+              <div className="px-3 py-2"></div>
             </div>
-          )}
+
+            {/* Table Body */}
+            {items.length === 0 ? (
+              <div className="px-3 py-8 text-muted-foreground text-center text-sm">
+                No items added yet. Add items from your catalog or create custom items.
+              </div>
+            ) : (
+              <div className="divide-y">
+                <AnimatePresence mode="popLayout">
+                  {items.map((item, index) => (
+                    <motion.div
+                      key={item.id || `new-${index}`}
+                      layout
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      className="grid grid-cols-[1fr_100px_100px_80px_48px] items-center bg-card"
+                    >
+                      <div className="px-2 py-1.5">
+                        <Input
+                          value={item.name}
+                          onChange={(e) => updateItem(index, 'name', e.target.value)}
+                          placeholder="Item name"
+                          className="h-8 border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-offset-0"
+                        />
+                      </div>
+                      <div className="px-2 py-1.5">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.cogs}
+                          onChange={(e) => updateItem(index, 'cogs', parseFloat(e.target.value) || 0)}
+                          className="h-8 border-0 bg-transparent text-right focus-visible:ring-1 focus-visible:ring-offset-0"
+                        />
+                      </div>
+                      <div className="px-2 py-1.5">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.price}
+                          onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)}
+                          className="h-8 border-0 bg-transparent text-right focus-visible:ring-1 focus-visible:ring-offset-0"
+                        />
+                      </div>
+                      <div className="px-2 py-1.5">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.starting_quantity}
+                          onChange={(e) => updateItem(index, 'starting_quantity', parseInt(e.target.value) || 0)}
+                          className="h-8 border-0 bg-transparent text-right focus-visible:ring-1 focus-visible:ring-offset-0"
+                        />
+                      </div>
+                      <div className="px-2 py-1.5 flex justify-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeItem(index)}
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Save Buttons */}
