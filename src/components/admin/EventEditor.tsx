@@ -346,9 +346,9 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
               No items added yet. Add items from your catalog or create custom items.
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 flex flex-col">
               {items.map((item, index) => (
-                <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-secondary rounded-lg">
+                <div key={item.id || `new-${index}`} className="grid grid-cols-12 gap-2 items-end p-3 bg-secondary rounded-lg flex-shrink-0">
                   <div className="col-span-12 md:col-span-4 space-y-1">
                     <Label className="text-xs">Item Name</Label>
                     <Input
