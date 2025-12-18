@@ -624,6 +624,13 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
             <div className="bg-card rounded-lg p-4 border">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <DollarSign className="w-4 h-4" />
+                <span className="text-sm">COGS</span>
+              </div>
+              <p className="text-2xl font-bold text-muted-foreground">${totalCOGS.toFixed(2)}</p>
+            </div>
+            <div className="bg-card rounded-lg p-4 border">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <DollarSign className="w-4 h-4" />
                 <span className="text-sm">Revenue</span>
               </div>
               <p className="text-2xl font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
@@ -641,13 +648,6 @@ export const EventRunner = ({ event, onBack, onUpdate }: EventRunnerProps) => {
                 <span className="text-sm">Items Sold</span>
               </div>
               <p className="text-2xl font-bold">{totalItemsSold} / {totalInventory}</p>
-            </div>
-            <div className="bg-card rounded-lg p-4 border">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <DollarSign className="w-4 h-4" />
-                <span className="text-sm">COGS</span>
-              </div>
-              <p className="text-2xl font-bold text-muted-foreground">${totalCOGS.toFixed(2)}</p>
             </div>
           </div>
 
