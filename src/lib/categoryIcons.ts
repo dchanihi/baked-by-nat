@@ -2,12 +2,16 @@ import {
   Cookie, Cake, CakeSlice, Croissant, IceCream, Cherry, Coffee, Candy, 
   Package, UtensilsCrossed, Heart, Star, Sparkles, CircleDot, Donut,
   Sandwich, Pizza, Beef, Apple, Citrus, Grape, Banana, Carrot,
-  Milk, Egg, Wheat, ChefHat, CupSoda, Salad, Hop, Layers2,
+  Milk, Egg, Wheat, ChefHat, CupSoda, Salad, Hop,
   type LucideIcon
 } from 'lucide-react';
+import MacaronIcon from '@/components/icons/MacaronIcon';
+
+// Type for icons that can be either Lucide icons or custom components
+type IconComponent = LucideIcon | typeof MacaronIcon;
 
 // Comprehensive list of baked goods and food-related icons
-export const CATEGORY_ICONS: { name: string; icon: LucideIcon; label: string }[] = [
+export const CATEGORY_ICONS: { name: string; icon: IconComponent; label: string }[] = [
   { name: 'cookie', icon: Cookie, label: 'Cookie' },
   { name: 'cake', icon: Cake, label: 'Cake' },
   { name: 'cake-slice', icon: CakeSlice, label: 'Cake Slice' },
@@ -15,7 +19,7 @@ export const CATEGORY_ICONS: { name: string; icon: LucideIcon; label: string }[]
   { name: 'croissant', icon: Croissant, label: 'Croissant' },
   { name: 'loaf', icon: Sandwich, label: 'Loaf/Bread' },
   { name: 'sourdough', icon: Salad, label: 'Sourdough' },
-  { name: 'macaron', icon: Layers2, label: 'Macaron' },
+  { name: 'macaron', icon: MacaronIcon, label: 'Macaron' },
   { name: 'ice-cream', icon: IceCream, label: 'Ice Cream' },
   { name: 'cherry', icon: Cherry, label: 'Cherry' },
   { name: 'coffee', icon: Coffee, label: 'Coffee' },
@@ -42,7 +46,7 @@ export const CATEGORY_ICONS: { name: string; icon: LucideIcon; label: string }[]
   { name: 'package', icon: Package, label: 'Package' },
 ];
 
-export const getIconComponent = (iconName: string | null | undefined): LucideIcon => {
+export const getIconComponent = (iconName: string | null | undefined): IconComponent => {
   const found = CATEGORY_ICONS.find(i => i.name === iconName);
   return found?.icon || Cookie;
 };
