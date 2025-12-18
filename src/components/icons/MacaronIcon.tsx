@@ -14,21 +14,18 @@ const MacaronIcon = ({ size = 24, strokeWidth = 2, color = 'currentColor', ...pr
     {...props}
   >
     {/* Top shell - smooth dome */}
-    <path d="M3 9c0-3 4-5.5 9-5.5s9 2.5 9 5.5" />
-    <line x1="3" y1="9" x2="21" y2="9" />
+    <path d="M4 10c0-2.5 3.5-5 8-5s8 2.5 8 5" />
+    <ellipse cx="12" cy="10" rx="8" ry="2" />
     
     {/* Top shell ruffled feet */}
-    <path d="M3.5 10.5c1 0.6 1.5 0 2.5 0.6s1.5 0 2.5 0.6 1.5 0 2.5 0.6 1.5 0 2.5-0.6 1.5 0 2.5-0.6 1.5 0 2.5-0.6" />
-    
-    {/* Filling layer */}
-    <path d="M4 13h16" />
+    <path d="M4.5 11.5q1 .5 2 0t2 .5 2 0 2 .5 2 0 2 .5 2 0 1.5-.5" />
     
     {/* Bottom shell ruffled feet */}
-    <path d="M3.5 13.5c1 0.6 1.5 0 2.5 0.6s1.5 0 2.5 0.6 1.5 0 2.5 0.6 1.5 0 2.5-0.6 1.5 0 2.5-0.6 1.5 0 2.5-0.6" />
+    <path d="M4.5 12.5q1 .5 2 0t2 .5 2 0 2 .5 2 0 2 .5 2 0 1.5-.5" />
     
     {/* Bottom shell */}
-    <line x1="3" y1="15" x2="21" y2="15" />
-    <path d="M3 15c0 3 4 5.5 9 5.5s9-2.5 9-5.5" />
+    <ellipse cx="12" cy="14" rx="8" ry="2" />
+    <path d="M4 14c0 2.5 3.5 5 8 5s8-2.5 8-5" />
   </svg>
 );
 
