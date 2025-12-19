@@ -295,30 +295,61 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
         eventId = data.id;
       }
 
-      // Handle items - delete existing and insert new
-      if (event) {
-        await supabase
+      // Handle items - upsert to preserve quantity_sold and other runtime data
+      if (eventId) {
+        // Get existing items to find which ones to delete
+        const { data: existingItems } = await supabase
           .from('event_items')
-          .delete()
-          .eq('event_id', event.id);
-      }
-
-      if (items.length > 0 && eventId) {
-        const { error: itemsError } = await supabase
-          .from('event_items')
-          .insert(
-            items.map(item => ({
-              event_id: eventId,
+          .select('id')
+          .eq('event_id', eventId);
+        
+        const existingIds = new Set(existingItems?.map(i => i.id) || []);
+        const currentIds = new Set(items.filter(i => i.id).map(i => i.id));
+        
+        // Delete items that are no longer in the list
+        const idsToDelete = [...existingIds].filter(id => !currentIds.has(id));
+        if (idsToDelete.length > 0) {
+          await supabase
+            .from('event_items')
+            .delete()
+            .in('id', idsToDelete);
+        }
+        
+        // Update existing items (only the editable fields, preserving quantity_sold)
+        const itemsToUpdate = items.filter(item => item.id);
+        for (const item of itemsToUpdate) {
+          await supabase
+            .from('event_items')
+            .update({
               bake_id: item.bake_id,
               name: item.name,
               cogs: item.cogs,
               price: item.price,
               starting_quantity: item.starting_quantity,
               category: item.category,
-            }))
-          );
+            })
+            .eq('id', item.id);
+        }
+        
+        // Insert new items
+        const itemsToInsert = items.filter(item => !item.id);
+        if (itemsToInsert.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('event_items')
+            .insert(
+              itemsToInsert.map(item => ({
+                event_id: eventId,
+                bake_id: item.bake_id,
+                name: item.name,
+                cogs: item.cogs,
+                price: item.price,
+                starting_quantity: item.starting_quantity,
+                category: item.category,
+              }))
+            );
 
-        if (itemsError) throw itemsError;
+          if (itemsError) throw itemsError;
+        }
       }
 
       toast({
