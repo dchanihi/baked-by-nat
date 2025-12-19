@@ -27,7 +27,7 @@ interface Event {
   location: string | null;
   start_time: string;
   end_time: string | null;
-  status: 'draft' | 'active' | 'completed';
+  status: 'draft' | 'active' | 'completed' | 'archived';
   current_day?: number;
   day_open_time?: string | null;
   day_close_time?: string | null;

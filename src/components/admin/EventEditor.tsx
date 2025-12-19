@@ -47,7 +47,7 @@ interface Event {
   location: string | null;
   start_time: string;
   end_time: string | null;
-  status: 'draft' | 'active' | 'completed';
+  status: 'draft' | 'active' | 'completed' | 'archived';
   notes: string | null;
 }
 

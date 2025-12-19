@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Calendar, MapPin, Play, Edit, Trash2, Plus } from 'lucide-react';
+import { Calendar, MapPin, Play, Edit, Archive, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,19 +18,23 @@ interface Event {
   location: string | null;
   start_time: string;
   end_time: string | null;
-  status: 'draft' | 'active' | 'completed';
+  status: 'draft' | 'active' | 'completed' | 'archived';
   created_at: string;
 }
 
 interface EventsListProps {
   events: Event[];
   onEdit: (event: Event) => void;
-  onDelete: (id: string) => void;
+  onArchive: (id: string) => void;
   onRun: (event: Event) => void;
   onCreate: () => void;
+  onViewArchive: () => void;
 }
 
-export const EventsList = ({ events, onEdit, onDelete, onRun, onCreate }: EventsListProps) => {
+export const EventsList = ({ events, onEdit, onArchive, onRun, onCreate, onViewArchive }: EventsListProps) => {
+  // Filter out archived events
+  const activeEvents = events.filter(e => e.status !== 'archived');
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'draft':
@@ -39,6 +43,8 @@ export const EventsList = ({ events, onEdit, onDelete, onRun, onCreate }: Events
         return <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>;
       case 'completed':
         return <Badge variant="outline">Completed</Badge>;
+      case 'archived':
+        return <Badge variant="secondary" className="bg-muted text-muted-foreground">Archived</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -48,13 +54,19 @@ export const EventsList = ({ events, onEdit, onDelete, onRun, onCreate }: Events
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-semibold text-foreground">events</h2>
-        <Button onClick={onCreate} className="bg-pink-soft hover:bg-pink-medium">
-          <Plus className="w-4 h-4 mr-2" />
-          New Event
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onViewArchive}>
+            <Archive className="w-4 h-4 mr-2" />
+            View Archive
+          </Button>
+          <Button onClick={onCreate} className="bg-pink-soft hover:bg-pink-medium">
+            <Plus className="w-4 h-4 mr-2" />
+            New Event
+          </Button>
+        </div>
       </div>
 
-      {events.length === 0 ? (
+      {activeEvents.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <p>No events yet. Create your first pop-up event!</p>
         </div>
@@ -71,7 +83,7 @@ export const EventsList = ({ events, onEdit, onDelete, onRun, onCreate }: Events
               </TableRow>
             </TableHeader>
             <TableBody>
-              {events.map((event) => (
+              {activeEvents.map((event) => (
                 <TableRow key={event.id}>
                   <TableCell className="font-medium">{event.name}</TableCell>
                   <TableCell>
@@ -84,7 +96,7 @@ export const EventsList = ({ events, onEdit, onDelete, onRun, onCreate }: Events
                     {event.location && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <MapPin className="w-4 h-4" />
-                        {event.location}
+                        <span className="max-w-[200px] truncate">{event.location}</span>
                       </div>
                     )}
                   </TableCell>
@@ -111,10 +123,11 @@ export const EventsList = ({ events, onEdit, onDelete, onRun, onCreate }: Events
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => onDelete(event.id)}
-                        className="text-destructive hover:text-destructive"
+                        onClick={() => onArchive(event.id)}
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Archive event"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Archive className="w-4 h-4" />
                       </Button>
                     </div>
                   </TableCell>
