@@ -11,6 +11,7 @@ import { OrdersList } from '@/components/admin/OrdersList';
 import { OrderDetails } from '@/components/admin/OrderDetails';
 import { OrderOverview } from '@/components/admin/OrderOverview';
 import { EventsList } from '@/components/admin/EventsList';
+import { ArchivedEventsList } from '@/components/admin/ArchivedEventsList';
 import { EventEditor } from '@/components/admin/EventEditor';
 import { EventRunner } from '@/components/admin/EventRunner';
 import Navigation from '@/components/Navigation';
@@ -26,7 +27,7 @@ interface Event {
   location: string | null;
   start_time: string;
   end_time: string | null;
-  status: 'draft' | 'active' | 'completed';
+  status: 'draft' | 'active' | 'completed' | 'archived';
   notes: string | null;
   created_at: string;
 }
@@ -42,6 +43,7 @@ const Admin = () => {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [runningEvent, setRunningEvent] = useState<Event | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+  const [viewingArchive, setViewingArchive] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -201,8 +203,52 @@ const Admin = () => {
     setIsCreatingEvent(true);
   };
 
+  const handleArchiveEvent = async (id: string) => {
+    if (!confirm('Are you sure you want to archive this event?')) return;
+
+    const { error } = await supabase
+      .from('events')
+      .update({ status: 'archived' })
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to archive event.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Event archived successfully.',
+      });
+      loadEvents();
+    }
+  };
+
+  const handleRestoreEvent = async (id: string) => {
+    const { error } = await supabase
+      .from('events')
+      .update({ status: 'draft' })
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to restore event.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Event restored successfully.',
+      });
+      loadEvents();
+    }
+  };
+
   const handleDeleteEvent = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this event?')) return;
+    if (!confirm('Are you sure you want to permanently delete this event? This cannot be undone.')) return;
 
     const { error } = await supabase
       .from('events')
@@ -218,7 +264,7 @@ const Admin = () => {
     } else {
       toast({
         title: 'Success',
-        description: 'Event deleted successfully.',
+        description: 'Event permanently deleted.',
       });
       loadEvents();
     }
@@ -292,6 +338,13 @@ const Admin = () => {
             onSave={handleSaveComplete}
             onCancel={handleCancel}
           />
+        ) : viewingArchive ? (
+          <ArchivedEventsList
+            events={events}
+            onRestore={handleRestoreEvent}
+            onDelete={handleDeleteEvent}
+            onBack={() => setViewingArchive(false)}
+          />
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full max-w-3xl grid-cols-4">
@@ -327,9 +380,10 @@ const Admin = () => {
               <EventsList
                 events={events}
                 onEdit={handleEditEvent}
-                onDelete={handleDeleteEvent}
+                onArchive={handleArchiveEvent}
                 onRun={handleRunEvent}
                 onCreate={handleCreateEvent}
+                onViewArchive={() => setViewingArchive(true)}
               />
             </TabsContent>
           </Tabs>
