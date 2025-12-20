@@ -225,6 +225,44 @@ export type Database = {
           },
         ]
       }
+      event_schedules: {
+        Row: {
+          created_at: string
+          date: string
+          day_number: number
+          end_time: string | null
+          event_id: string
+          id: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          day_number?: number
+          end_time?: string | null
+          event_id: string
+          id?: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          day_number?: number
+          end_time?: string | null
+          event_id?: string
+          id?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_schedules_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           created_at: string

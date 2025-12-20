@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Trash2, Link, Package, Filter } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Link, Package, Filter, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CurrencyInput } from './CurrencyInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
@@ -40,6 +40,14 @@ interface EventItem {
   category: string | null;
 }
 
+interface ScheduleDay {
+  id?: string;
+  day_number: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+}
+
 interface Event {
   id: string;
   name: string;
@@ -61,13 +69,10 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
   const [name, setName] = useState(event?.name || '');
   const [description, setDescription] = useState(event?.description || '');
   const [location, setLocation] = useState(event?.location || '');
-  const [startTime, setStartTime] = useState(
-    event?.start_time ? new Date(event.start_time).toISOString().slice(0, 16) : ''
-  );
-  const [endTime, setEndTime] = useState(
-    event?.end_time ? new Date(event.end_time).toISOString().slice(0, 16) : ''
-  );
   const [notes, setNotes] = useState(event?.notes || '');
+  const [scheduleDays, setScheduleDays] = useState<ScheduleDay[]>([
+    { day_number: 1, date: '', start_time: '09:00', end_time: '17:00' }
+  ]);
   const [items, setItems] = useState<EventItem[]>([]);
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -173,8 +178,68 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
     loadCategories();
     if (event) {
       loadEventItems();
+      loadScheduleDays();
     }
   }, [event]);
+
+  const loadScheduleDays = async () => {
+    if (!event) return;
+    const { data } = await supabase
+      .from('event_schedules')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('day_number');
+    
+    if (data && data.length > 0) {
+      setScheduleDays(data.map(d => ({
+        id: d.id,
+        day_number: d.day_number,
+        date: d.date,
+        start_time: d.start_time,
+        end_time: d.end_time || '',
+      })));
+    } else if (event.start_time) {
+      // Fallback to legacy single start/end time
+      const startDate = new Date(event.start_time);
+      setScheduleDays([{
+        day_number: 1,
+        date: startDate.toISOString().split('T')[0],
+        start_time: startDate.toTimeString().slice(0, 5),
+        end_time: event.end_time ? new Date(event.end_time).toTimeString().slice(0, 5) : '',
+      }]);
+    }
+  };
+
+  const addScheduleDay = () => {
+    const lastDay = scheduleDays[scheduleDays.length - 1];
+    let nextDate = '';
+    if (lastDay?.date) {
+      const d = new Date(lastDay.date);
+      d.setDate(d.getDate() + 1);
+      nextDate = d.toISOString().split('T')[0];
+    }
+    setScheduleDays([...scheduleDays, {
+      day_number: scheduleDays.length + 1,
+      date: nextDate,
+      start_time: lastDay?.start_time || '09:00',
+      end_time: lastDay?.end_time || '17:00',
+    }]);
+  };
+
+  const removeScheduleDay = (index: number) => {
+    if (scheduleDays.length <= 1) return;
+    const updated = scheduleDays.filter((_, i) => i !== index).map((d, i) => ({
+      ...d,
+      day_number: i + 1,
+    }));
+    setScheduleDays(updated);
+  };
+
+  const updateScheduleDay = (index: number, field: keyof ScheduleDay, value: string | number) => {
+    const updated = [...scheduleDays];
+    updated[index] = { ...updated[index], [field]: value };
+    setScheduleDays(updated);
+  };
 
   const loadCategories = async () => {
     const { data } = await supabase
@@ -246,14 +311,23 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
   };
 
   const handleSave = async () => {
-    if (!name || !startTime) {
+    if (!name || scheduleDays.length === 0 || !scheduleDays[0].date) {
       toast({
         title: 'Error',
-        description: 'Please fill in event name and start time.',
+        description: 'Please fill in event name and at least one schedule day.',
         variant: 'destructive',
       });
       return;
     }
+
+    // Calculate overall start and end times from schedule
+    const sortedDays = [...scheduleDays].sort((a, b) => a.date.localeCompare(b.date));
+    const firstDay = sortedDays[0];
+    const lastDay = sortedDays[sortedDays.length - 1];
+    const overallStartTime = new Date(`${firstDay.date}T${firstDay.start_time}`).toISOString();
+    const overallEndTime = lastDay.end_time 
+      ? new Date(`${lastDay.date}T${lastDay.end_time}`).toISOString()
+      : null;
 
     setSaving(true);
 
@@ -268,8 +342,8 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
             name,
             description: description || null,
             location: location || null,
-            start_time: new Date(startTime).toISOString(),
-            end_time: endTime ? new Date(endTime).toISOString() : null,
+            start_time: overallStartTime,
+            end_time: overallEndTime,
             notes: notes || null,
           })
           .eq('id', event.id);
@@ -283,8 +357,8 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
             name,
             description: description || null,
             location: location || null,
-            start_time: new Date(startTime).toISOString(),
-            end_time: endTime ? new Date(endTime).toISOString() : null,
+            start_time: overallStartTime,
+            end_time: overallEndTime,
             notes: notes || null,
             status: 'draft',
           })
@@ -350,6 +424,28 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
 
           if (itemsError) throw itemsError;
         }
+
+        // Save schedule days
+        // Delete existing schedules
+        await supabase
+          .from('event_schedules')
+          .delete()
+          .eq('event_id', eventId);
+        
+        // Insert new schedules
+        const { error: scheduleError } = await supabase
+          .from('event_schedules')
+          .insert(
+            scheduleDays.map((day, index) => ({
+              event_id: eventId,
+              day_number: index + 1,
+              date: day.date,
+              start_time: day.start_time,
+              end_time: day.end_time || null,
+            }))
+          );
+        
+        if (scheduleError) throw scheduleError;
       }
 
       toast({
@@ -402,24 +498,60 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="startTime">Start Time *</Label>
-            <Input
-              id="startTime"
-              type="datetime-local"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-            />
+        {/* Schedule Days */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-base font-medium flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Schedule *
+            </Label>
+            <Button variant="outline" size="sm" onClick={addScheduleDay} type="button">
+              <Plus className="w-4 h-4 mr-1" />
+              Add Day
+            </Button>
           </div>
+          
           <div className="space-y-2">
-            <Label htmlFor="endTime">End Time</Label>
-            <Input
-              id="endTime"
-              type="datetime-local"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-            />
+            {scheduleDays.map((day, index) => (
+              <div key={index} className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center bg-muted/30 rounded-lg p-2">
+                <span className="text-sm font-medium text-muted-foreground w-16">
+                  Day {day.day_number}
+                </span>
+                <Input
+                  type="date"
+                  value={day.date}
+                  onChange={(e) => updateScheduleDay(index, 'date', e.target.value)}
+                  className="h-9"
+                />
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="time"
+                    value={day.start_time}
+                    onChange={(e) => updateScheduleDay(index, 'start_time', e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground text-sm">to</span>
+                  <Input
+                    type="time"
+                    value={day.end_time}
+                    onChange={(e) => updateScheduleDay(index, 'end_time', e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeScheduleDay(index)}
+                  disabled={scheduleDays.length <= 1}
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  type="button"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
           </div>
         </div>
 
