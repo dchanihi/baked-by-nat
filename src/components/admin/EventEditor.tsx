@@ -586,36 +586,42 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
           </div>
           
           {/* Schedule Mode Selector */}
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => handleScheduleModeChange('same')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                scheduleMode === 'same'
-                  ? 'border-primary bg-primary/5 text-primary'
-                  : 'border-muted bg-muted/30 text-muted-foreground hover:bg-muted/50'
-              }`}
+              className="flex items-center gap-2 text-sm"
             >
-              <Clock className="w-4 h-4" />
-              <div className="text-left">
-                <div className="font-medium text-sm">Same times each day</div>
-                <div className="text-xs opacity-70">Standard schedule</div>
+              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                scheduleMode === 'same'
+                  ? 'border-primary bg-primary'
+                  : 'border-muted-foreground/50'
+              }`}>
+                {scheduleMode === 'same' && (
+                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
               </div>
+              <span className={scheduleMode === 'same' ? 'text-foreground' : 'text-muted-foreground'}>Same times each day</span>
             </button>
             <button
               type="button"
               onClick={() => handleScheduleModeChange('different')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                scheduleMode === 'different'
-                  ? 'border-primary bg-primary/5 text-primary'
-                  : 'border-muted bg-muted/30 text-muted-foreground hover:bg-muted/50'
-              }`}
+              className="flex items-center gap-2 text-sm"
             >
-              <Calendar className="w-4 h-4" />
-              <div className="text-left">
-                <div className="font-medium text-sm">Different times per day</div>
-                <div className="text-xs opacity-70">Custom schedule</div>
+              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                scheduleMode === 'different'
+                  ? 'border-primary bg-primary'
+                  : 'border-muted-foreground/50'
+              }`}>
+                {scheduleMode === 'different' && (
+                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
               </div>
+              <span className={scheduleMode === 'different' ? 'text-foreground' : 'text-muted-foreground'}>Different times per day</span>
             </button>
           </div>
 
