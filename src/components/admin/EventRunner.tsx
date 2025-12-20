@@ -65,6 +65,15 @@ export const EventRunner = ({
   const [inventoryEdits, setInventoryEdits] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState('sales');
   const [categoryIconMap, setCategoryIconMap] = useState<Record<string, string>>({});
+  const [allCategories, setAllCategories] = useState<{name: string; icon: string | null}[]>([]);
+  
+  // Add new item state
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemPrice, setNewItemPrice] = useState('');
+  const [newItemCogs, setNewItemCogs] = useState('');
+  const [newItemQuantity, setNewItemQuantity] = useState('');
+  const [newItemCategory, setNewItemCategory] = useState('');
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -143,7 +152,68 @@ export const EventRunner = ({
         }
       });
       setCategoryIconMap(iconMap);
+      setAllCategories(data);
     }
+  };
+  
+  const resetNewItemForm = () => {
+    setNewItemName('');
+    setNewItemPrice('');
+    setNewItemCogs('');
+    setNewItemQuantity('');
+    setNewItemCategory('');
+    setShowAddItem(false);
+  };
+  
+  const addNewItem = async () => {
+    if (!newItemName.trim() || !newItemPrice || !newItemQuantity) {
+      toast({
+        title: 'Missing fields',
+        description: 'Please fill in name, price, and quantity.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    const { data, error } = await supabase.from('event_items').insert({
+      event_id: event.id,
+      name: newItemName.trim(),
+      price: parseFloat(newItemPrice) || 0,
+      cogs: parseFloat(newItemCogs) || 0,
+      starting_quantity: parseInt(newItemQuantity) || 0,
+      category: newItemCategory || null,
+    }).select().single();
+    
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to add item.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Add to local state
+    const newItem: EventItem = {
+      id: data.id,
+      name: data.name,
+      cogs: Number(data.cogs),
+      price: Number(data.price),
+      starting_quantity: data.starting_quantity,
+      quantity_sold: data.quantity_sold,
+      category: data.category || null
+    };
+    setItems([...items, newItem]);
+    setInventoryEdits({
+      ...inventoryEdits,
+      [data.id]: data.starting_quantity
+    });
+    
+    resetNewItemForm();
+    toast({
+      title: 'Item Added',
+      description: `${newItemName} has been added to the inventory.`
+    });
   };
   const loadEventDetails = async () => {
     const {
@@ -490,45 +560,162 @@ export const EventRunner = ({
             {!isFirstDay && <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-sm">Adjust Inventory for Day {dayNumber}</h3>
-                  {!editingInventory ? <Button variant="outline" size="sm" onClick={() => setEditingInventory(true)}>
-                      <Edit2 className="w-4 h-4 mr-1" />
-                      Edit Quantities
-                    </Button> : <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => {
-                  setEditingInventory(false);
-                  const edits: Record<string, number> = {};
-                  items.forEach(item => {
-                    edits[item.id] = item.starting_quantity;
-                  });
-                  setInventoryEdits(edits);
-                }}>
-                        Cancel
+                  <div className="flex gap-2">
+                    {!editingInventory ? (
+                      <Button variant="outline" size="sm" onClick={() => setEditingInventory(true)}>
+                        <Edit2 className="w-4 h-4 mr-1" />
+                        Edit Quantities
                       </Button>
-                      <Button size="sm" onClick={saveInventoryEdits} className="bg-pink-soft hover:bg-pink-medium">
-                        Save Changes
-                      </Button>
-                    </div>}
+                    ) : (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => {
+                          setEditingInventory(false);
+                          setShowAddItem(false);
+                          const edits: Record<string, number> = {};
+                          items.forEach(item => {
+                            edits[item.id] = item.starting_quantity;
+                          });
+                          setInventoryEdits(edits);
+                        }}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={saveInventoryEdits} className="bg-pink-soft hover:bg-pink-medium">
+                          Save Changes
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 
-                {editingInventory ? <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {items.map(item => <div key={item.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center">
-                        <div>
-                          <span className="font-medium">{item.name}</span>
-                          <span className="text-muted-foreground text-sm ml-2">
-                            (sold: {item.quantity_sold})
-                          </span>
+                {editingInventory ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {items.map(item => (
+                        <div key={item.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center">
+                          <div>
+                            <span className="font-medium">{item.name}</span>
+                            <span className="text-muted-foreground text-sm ml-2">
+                              (sold: {item.quantity_sold})
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm text-muted-foreground">Qty:</Label>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              value={inventoryEdits[item.id] || 0} 
+                              onChange={e => setInventoryEdits({
+                                ...inventoryEdits,
+                                [item.id]: parseInt(e.target.value) || 0
+                              })} 
+                              className="w-20 h-8" 
+                            />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm text-muted-foreground">Qty:</Label>
-                          <Input type="number" min="0" value={inventoryEdits[item.id] || 0} onChange={e => setInventoryEdits({
-                    ...inventoryEdits,
-                    [item.id]: parseInt(e.target.value) || 0
-                  })} className="w-20 h-8" />
+                      ))}
+                    </div>
+                    
+                    {/* Add New Item Section */}
+                    {!showAddItem ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setShowAddItem(true)}
+                        className="w-full border-dashed"
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add New Item
+                      </Button>
+                    ) : (
+                      <div className="bg-secondary/50 rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm">New Item</span>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={resetNewItemForm}
+                            className="h-7 w-7 p-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
                         </div>
-                      </div>)}
-                  </div> : <p className="text-sm text-muted-foreground">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="col-span-2">
+                            <Label className="text-xs text-muted-foreground">Name *</Label>
+                            <Input 
+                              placeholder="Item name" 
+                              value={newItemName}
+                              onChange={e => setNewItemName(e.target.value)}
+                              className="h-8"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Price *</Label>
+                            <Input 
+                              type="number" 
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00" 
+                              value={newItemPrice}
+                              onChange={e => setNewItemPrice(e.target.value)}
+                              className="h-8"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">COGS</Label>
+                            <Input 
+                              type="number" 
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00" 
+                              value={newItemCogs}
+                              onChange={e => setNewItemCogs(e.target.value)}
+                              className="h-8"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Quantity *</Label>
+                            <Input 
+                              type="number" 
+                              min="0"
+                              placeholder="0" 
+                              value={newItemQuantity}
+                              onChange={e => setNewItemQuantity(e.target.value)}
+                              className="h-8"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Category</Label>
+                            <Select value={newItemCategory} onValueChange={setNewItemCategory}>
+                              <SelectTrigger className="h-8">
+                                <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allCategories.map(cat => (
+                                  <SelectItem key={cat.name} value={cat.name}>
+                                    {cat.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          onClick={addNewItem}
+                          className="w-full bg-pink-soft hover:bg-pink-medium"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Item
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
                     Restock or adjust quantities before starting the next day.
-                  </p>}
+                  </p>
+                )}
               </div>}
 
             <div className="space-y-3 pt-2">
