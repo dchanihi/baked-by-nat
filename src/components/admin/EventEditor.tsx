@@ -7,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import { ArrowLeft, Plus, Trash2, Link, Package, Filter, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, eachDayOfInterval } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CurrencyInput } from './CurrencyInput';
@@ -657,15 +658,20 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
             {/* Left: Calendar */}
             <div className="border-r p-2">
               <Calendar
-                mode="multiple"
-                selected={scheduleDays.map(d => d.date ? new Date(d.date + 'T00:00:00') : undefined).filter(Boolean) as Date[]}
-                onSelect={(dates) => {
-                  if (!dates) {
+                mode="range"
+                selected={scheduleDays.length > 0 && scheduleDays[0].date ? {
+                  from: new Date(scheduleDays[0].date + 'T00:00:00'),
+                  to: scheduleDays.length > 1 ? new Date(scheduleDays[scheduleDays.length - 1].date + 'T00:00:00') : undefined
+                } : undefined}
+                onSelect={(range: DateRange | undefined) => {
+                  if (!range?.from) {
                     setScheduleDays([{ day_number: 1, date: '', start_time: commonStartTime, end_time: commonEndTime }]);
                     return;
                   }
-                  const sortedDates = [...dates].sort((a, b) => a.getTime() - b.getTime());
-                  const newScheduleDays: ScheduleDay[] = sortedDates.map((date, index) => {
+                  const startDate = range.from;
+                  const endDate = range.to || range.from;
+                  const allDates = eachDayOfInterval({ start: startDate, end: endDate });
+                  const newScheduleDays: ScheduleDay[] = allDates.map((date, index) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
                     const existingDay = scheduleDays.find(d => d.date === dateStr);
                     return {
@@ -676,11 +682,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                       end_time: existingDay?.end_time || (scheduleMode === 'same' ? commonEndTime : '17:00'),
                     };
                   });
-                  if (newScheduleDays.length === 0) {
-                    setScheduleDays([{ day_number: 1, date: '', start_time: commonStartTime, end_time: commonEndTime }]);
-                  } else {
-                    setScheduleDays(newScheduleDays);
-                  }
+                  setScheduleDays(newScheduleDays);
                 }}
                 className="pointer-events-auto"
               />
