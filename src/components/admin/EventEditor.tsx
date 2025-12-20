@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Trash2, Link, Package, Filter, Calendar } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Link, Package, Filter, Calendar, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CurrencyInput } from './CurrencyInput';
 import { LocationAutocomplete } from './LocationAutocomplete';
@@ -48,6 +48,8 @@ interface ScheduleDay {
   end_time: string;
 }
 
+type ScheduleMode = 'same' | 'different';
+
 interface Event {
   id: string;
   name: string;
@@ -70,6 +72,9 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
   const [description, setDescription] = useState(event?.description || '');
   const [location, setLocation] = useState(event?.location || '');
   const [notes, setNotes] = useState(event?.notes || '');
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('same');
+  const [commonStartTime, setCommonStartTime] = useState('09:00');
+  const [commonEndTime, setCommonEndTime] = useState('17:00');
   const [scheduleDays, setScheduleDays] = useState<ScheduleDay[]>([
     { day_number: 1, date: '', start_time: '09:00', end_time: '17:00' }
   ]);
@@ -191,22 +196,72 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
       .order('day_number');
     
     if (data && data.length > 0) {
-      setScheduleDays(data.map(d => ({
+      const loadedDays = data.map(d => ({
         id: d.id,
         day_number: d.day_number,
         date: d.date,
         start_time: d.start_time,
         end_time: d.end_time || '',
-      })));
+      }));
+      setScheduleDays(loadedDays);
+      
+      // Determine schedule mode based on loaded data
+      const allSameTime = loadedDays.every(
+        d => d.start_time === loadedDays[0].start_time && d.end_time === loadedDays[0].end_time
+      );
+      if (allSameTime && loadedDays.length > 0) {
+        setScheduleMode('same');
+        setCommonStartTime(loadedDays[0].start_time);
+        setCommonEndTime(loadedDays[0].end_time);
+      } else {
+        setScheduleMode('different');
+      }
     } else if (event.start_time) {
       // Fallback to legacy single start/end time
       const startDate = new Date(event.start_time);
+      const startTime = startDate.toTimeString().slice(0, 5);
+      const endTime = event.end_time ? new Date(event.end_time).toTimeString().slice(0, 5) : '';
       setScheduleDays([{
         day_number: 1,
         date: startDate.toISOString().split('T')[0],
-        start_time: startDate.toTimeString().slice(0, 5),
-        end_time: event.end_time ? new Date(event.end_time).toTimeString().slice(0, 5) : '',
+        start_time: startTime,
+        end_time: endTime,
       }]);
+      setCommonStartTime(startTime);
+      setCommonEndTime(endTime);
+    }
+  };
+
+  // When schedule mode changes to 'same', apply common times to all days
+  const handleScheduleModeChange = (mode: ScheduleMode) => {
+    setScheduleMode(mode);
+    if (mode === 'same') {
+      setScheduleDays(prev => prev.map(day => ({
+        ...day,
+        start_time: commonStartTime,
+        end_time: commonEndTime,
+      })));
+    }
+  };
+
+  // When common times change, apply to all days if in 'same' mode
+  const handleCommonStartTimeChange = (time: string) => {
+    setCommonStartTime(time);
+    if (scheduleMode === 'same') {
+      setScheduleDays(prev => prev.map(day => ({
+        ...day,
+        start_time: time,
+      })));
+    }
+  };
+
+  const handleCommonEndTimeChange = (time: string) => {
+    setCommonEndTime(time);
+    if (scheduleMode === 'same') {
+      setScheduleDays(prev => prev.map(day => ({
+        ...day,
+        end_time: time,
+      })));
     }
   };
 
@@ -218,12 +273,35 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
       d.setDate(d.getDate() + 1);
       nextDate = d.toISOString().split('T')[0];
     }
+    const startTime = scheduleMode === 'same' ? commonStartTime : (lastDay?.start_time || '09:00');
+    const endTime = scheduleMode === 'same' ? commonEndTime : (lastDay?.end_time || '17:00');
     setScheduleDays([...scheduleDays, {
       day_number: scheduleDays.length + 1,
       date: nextDate,
-      start_time: lastDay?.start_time || '09:00',
-      end_time: lastDay?.end_time || '17:00',
+      start_time: startTime,
+      end_time: endTime,
     }]);
+  };
+
+  const addMultipleDays = (count: number) => {
+    const lastDay = scheduleDays[scheduleDays.length - 1];
+    const newDays: ScheduleDay[] = [];
+    for (let i = 0; i < count; i++) {
+      let nextDate = '';
+      const prevDay = i === 0 ? lastDay : newDays[i - 1];
+      if (prevDay?.date) {
+        const d = new Date(prevDay.date);
+        d.setDate(d.getDate() + 1);
+        nextDate = d.toISOString().split('T')[0];
+      }
+      newDays.push({
+        day_number: scheduleDays.length + i + 1,
+        date: nextDate,
+        start_time: scheduleMode === 'same' ? commonStartTime : (lastDay?.start_time || '09:00'),
+        end_time: scheduleMode === 'same' ? commonEndTime : (lastDay?.end_time || '17:00'),
+      });
+    }
+    setScheduleDays([...scheduleDays, ...newDays]);
   };
 
   const removeScheduleDay = (index: number) => {
@@ -499,59 +577,163 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
         </div>
 
         {/* Schedule Days */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label className="text-base font-medium flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               Schedule *
             </Label>
-            <Button variant="outline" size="sm" onClick={addScheduleDay} type="button">
-              <Plus className="w-4 h-4 mr-1" />
-              Add Day
-            </Button>
           </div>
           
-          <div className="space-y-2">
-            {scheduleDays.map((day, index) => (
-              <div key={index} className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center bg-muted/30 rounded-lg p-2">
-                <span className="text-sm font-medium text-muted-foreground w-16">
-                  Day {day.day_number}
-                </span>
-                <Input
-                  type="date"
-                  value={day.date}
-                  onChange={(e) => updateScheduleDay(index, 'date', e.target.value)}
-                  className="h-9"
-                />
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="time"
-                    value={day.start_time}
-                    onChange={(e) => updateScheduleDay(index, 'start_time', e.target.value)}
-                    className="h-9"
-                  />
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-muted-foreground text-sm">to</span>
-                  <Input
-                    type="time"
-                    value={day.end_time}
-                    onChange={(e) => updateScheduleDay(index, 'end_time', e.target.value)}
-                    className="h-9"
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeScheduleDay(index)}
-                  disabled={scheduleDays.length <= 1}
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  type="button"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+          {/* Schedule Mode Selector */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleScheduleModeChange('same')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
+                scheduleMode === 'same'
+                  ? 'border-primary bg-primary/5 text-primary'
+                  : 'border-muted bg-muted/30 text-muted-foreground hover:bg-muted/50'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              <div className="text-left">
+                <div className="font-medium text-sm">Same times each day</div>
+                <div className="text-xs opacity-70">Standard schedule</div>
               </div>
-            ))}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleScheduleModeChange('different')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
+                scheduleMode === 'different'
+                  ? 'border-primary bg-primary/5 text-primary'
+                  : 'border-muted bg-muted/30 text-muted-foreground hover:bg-muted/50'
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              <div className="text-left">
+                <div className="font-medium text-sm">Different times per day</div>
+                <div className="text-xs opacity-70">Custom schedule</div>
+              </div>
+            </button>
+          </div>
+
+          {/* Common time inputs for 'same' mode */}
+          {scheduleMode === 'same' && (
+            <div className="flex items-center gap-3 bg-muted/30 rounded-lg p-3">
+              <span className="text-sm font-medium text-muted-foreground">Daily hours:</span>
+              <Input
+                type="time"
+                value={commonStartTime}
+                onChange={(e) => handleCommonStartTimeChange(e.target.value)}
+                className="h-9 w-32"
+              />
+              <span className="text-muted-foreground text-sm">to</span>
+              <Input
+                type="time"
+                value={commonEndTime}
+                onChange={(e) => handleCommonEndTimeChange(e.target.value)}
+                className="h-9 w-32"
+              />
+            </div>
+          )}
+          
+          {/* Days list header with add buttons */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">
+              {scheduleDays.length} day{scheduleDays.length !== 1 ? 's' : ''}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={addScheduleDay} type="button">
+                <Plus className="w-4 h-4 mr-1" />
+                Add Day
+              </Button>
+              {scheduleDays.length < 3 && (
+                <Button variant="outline" size="sm" onClick={() => addMultipleDays(3)} type="button">
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add 3 Days
+                </Button>
+              )}
+              {scheduleDays.length < 5 && (
+                <Button variant="outline" size="sm" onClick={() => addMultipleDays(7)} type="button">
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Week
+                </Button>
+              )}
+            </div>
+          </div>
+          
+          {/* Days list */}
+          <div className="space-y-2">
+            {scheduleMode === 'same' ? (
+              // Compact view for same times mode
+              scheduleDays.map((day, index) => (
+                <div key={index} className="grid grid-cols-[auto_1fr_auto] gap-2 items-center bg-muted/30 rounded-lg p-2">
+                  <span className="text-sm font-medium text-muted-foreground w-16">
+                    Day {day.day_number}
+                  </span>
+                  <Input
+                    type="date"
+                    value={day.date}
+                    onChange={(e) => updateScheduleDay(index, 'date', e.target.value)}
+                    className="h-9"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeScheduleDay(index)}
+                    disabled={scheduleDays.length <= 1}
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    type="button"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))
+            ) : (
+              // Full view for different times mode
+              scheduleDays.map((day, index) => (
+                <div key={index} className="grid grid-cols-[auto_1fr_120px_120px_auto] gap-2 items-center bg-muted/30 rounded-lg p-2">
+                  <span className="text-sm font-medium text-muted-foreground w-16">
+                    Day {day.day_number}
+                  </span>
+                  <Input
+                    type="date"
+                    value={day.date}
+                    onChange={(e) => updateScheduleDay(index, 'date', e.target.value)}
+                    className="h-9"
+                  />
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="time"
+                      value={day.start_time}
+                      onChange={(e) => updateScheduleDay(index, 'start_time', e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground text-sm">to</span>
+                    <Input
+                      type="time"
+                      value={day.end_time}
+                      onChange={(e) => updateScheduleDay(index, 'end_time', e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeScheduleDay(index)}
+                    disabled={scheduleDays.length <= 1}
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    type="button"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
