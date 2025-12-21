@@ -81,6 +81,11 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
   const [scheduleDays, setScheduleDays] = useState<ScheduleDay[]>([
     { day_number: 1, date: '', start_time: '09:00', end_time: '17:00' }
   ]);
+  
+  // Drag-select state for calendar
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartDate, setDragStartDate] = useState<Date | null>(null);
+  const [dragEndDate, setDragEndDate] = useState<Date | null>(null);
   const [items, setItems] = useState<EventItem[]>([]);
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -321,6 +326,92 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
     updated[index] = { ...updated[index], [field]: value };
     setScheduleDays(updated);
   };
+
+  // Drag-select handlers for calendar
+  const handleDayMouseDown = useCallback((date: Date, e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStartDate(date);
+    setDragEndDate(date);
+  }, []);
+
+  const handleDayMouseEnter = useCallback((date: Date) => {
+    if (isDragging && dragStartDate) {
+      setDragEndDate(date);
+    }
+  }, [isDragging, dragStartDate]);
+
+  const handleDragEnd = useCallback(() => {
+    if (isDragging && dragStartDate && dragEndDate) {
+      const startTime = dragStartDate.getTime();
+      const endTime = dragEndDate.getTime();
+      const minDate = new Date(Math.min(startTime, endTime));
+      const maxDate = new Date(Math.max(startTime, endTime));
+      
+      // Generate all dates in the range
+      const newDates: Date[] = [];
+      const current = new Date(minDate);
+      while (current <= maxDate) {
+        newDates.push(new Date(current));
+        current.setDate(current.getDate() + 1);
+      }
+      
+      // Merge with existing dates
+      const existingDateStrings = new Set(scheduleDays.map(d => d.date).filter(Boolean));
+      const allDates = [...newDates];
+      scheduleDays.forEach(d => {
+        if (d.date && !newDates.some(nd => format(nd, 'yyyy-MM-dd') === d.date)) {
+          allDates.push(new Date(d.date + 'T00:00:00'));
+        }
+      });
+      
+      const sortedDates = allDates.sort((a, b) => a.getTime() - b.getTime());
+      const newScheduleDays: ScheduleDay[] = sortedDates.map((date, index) => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const existingDay = scheduleDays.find(d => d.date === dateStr);
+        return {
+          id: existingDay?.id,
+          day_number: index + 1,
+          date: dateStr,
+          start_time: existingDay?.start_time || (scheduleMode === 'same' ? commonStartTime : '09:00'),
+          end_time: existingDay?.end_time || (scheduleMode === 'same' ? commonEndTime : '17:00'),
+        };
+      });
+      
+      setScheduleDays(newScheduleDays.length > 0 ? newScheduleDays : [{ day_number: 1, date: '', start_time: commonStartTime, end_time: commonEndTime }]);
+    }
+    setIsDragging(false);
+    setDragStartDate(null);
+    setDragEndDate(null);
+  }, [isDragging, dragStartDate, dragEndDate, scheduleDays, scheduleMode, commonStartTime, commonEndTime]);
+
+  // Global mouse up listener for drag-select
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (isDragging) {
+        handleDragEnd();
+      }
+    };
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => window.removeEventListener('mouseup', handleMouseUp);
+  }, [isDragging, handleDragEnd]);
+
+  // Calculate dates in drag range for highlighting
+  const getDragRangeDates = useCallback((): Set<string> => {
+    if (!isDragging || !dragStartDate || !dragEndDate) return new Set();
+    const startTime = dragStartDate.getTime();
+    const endTime = dragEndDate.getTime();
+    const minDate = new Date(Math.min(startTime, endTime));
+    const maxDate = new Date(Math.max(startTime, endTime));
+    
+    const dates = new Set<string>();
+    const current = new Date(minDate);
+    while (current <= maxDate) {
+      dates.add(format(current, 'yyyy-MM-dd'));
+      current.setDate(current.getDate() + 1);
+    }
+    return dates;
+  }, [isDragging, dragStartDate, dragEndDate]);
 
   const loadCategories = async () => {
     const { data } = await supabase
@@ -654,12 +745,14 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
 
           {/* Calendar + Day Details Split View */}
           <div className="grid grid-cols-[auto_1fr] gap-4 border rounded-lg bg-muted/10">
-            {/* Left: Calendar */}
-            <div className="border-r p-2">
+            {/* Left: Calendar with drag-select */}
+            <div className="border-r p-2 select-none">
               <Calendar
                 mode="multiple"
                 selected={scheduleDays.map(d => d.date ? new Date(d.date + 'T00:00:00') : undefined).filter(Boolean) as Date[]}
                 onSelect={(dates) => {
+                  // Only handle clicks when not dragging
+                  if (isDragging) return;
                   if (!dates) {
                     setScheduleDays([{ day_number: 1, date: '', start_time: commonStartTime, end_time: commonEndTime }]);
                     return;
@@ -683,7 +776,39 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                   }
                 }}
                 className="pointer-events-auto"
+                modifiers={{
+                  dragging: (date) => getDragRangeDates().has(format(date, 'yyyy-MM-dd')),
+                }}
+                modifiersClassNames={{
+                  dragging: 'bg-primary/30 text-primary-foreground',
+                }}
+                components={{
+                  Day: ({ date, ...props }) => {
+                    const dateStr = format(date, 'yyyy-MM-dd');
+                    const isSelected = scheduleDays.some(d => d.date === dateStr);
+                    const isInDragRange = getDragRangeDates().has(dateStr);
+                    
+                    return (
+                      <button
+                        {...props}
+                        type="button"
+                        onMouseDown={(e) => handleDayMouseDown(date, e)}
+                        onMouseEnter={() => handleDayMouseEnter(date)}
+                        className={`h-9 w-9 p-0 font-normal rounded-md transition-colors cursor-pointer
+                          ${isSelected ? 'bg-primary text-primary-foreground hover:bg-primary' : ''}
+                          ${isInDragRange && !isSelected ? 'bg-primary/40 text-foreground' : ''}
+                          ${!isSelected && !isInDragRange ? 'hover:bg-accent hover:text-accent-foreground' : ''}
+                        `}
+                      >
+                        {date.getDate()}
+                      </button>
+                    );
+                  },
+                }}
               />
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Click or drag to select dates
+              </p>
             </div>
 
             {/* Right: Day Details - Scrollable */}
@@ -692,7 +817,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                 <div className="space-y-2 pr-2">
                   {scheduleDays.filter(d => d.date).length === 0 ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground text-sm py-8">
-                      Click dates on the calendar to add event days
+                      Click or drag on the calendar to select event days
                     </div>
                   ) : (
                     scheduleDays.filter(d => d.date).sort((a, b) => a.date.localeCompare(b.date)).map((day, index) => (
