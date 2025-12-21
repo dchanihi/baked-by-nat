@@ -788,14 +788,50 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                     const isSelected = scheduleDays.some(d => d.date === dateStr);
                     const isInDragRange = getDragRangeDates().has(dateStr);
                     
+                    const handleClick = (e: React.MouseEvent) => {
+                      e.preventDefault();
+                      if (isSelected) {
+                        // Deselect the date
+                        const updated = scheduleDays.filter(d => d.date !== dateStr).map((d, i) => ({
+                          ...d,
+                          day_number: i + 1,
+                        }));
+                        if (updated.length === 0) {
+                          setScheduleDays([{ day_number: 1, date: '', start_time: commonStartTime, end_time: commonEndTime }]);
+                        } else {
+                          setScheduleDays(updated);
+                        }
+                      } else {
+                        // Select the date
+                        const newDay: ScheduleDay = {
+                          day_number: scheduleDays.length + 1,
+                          date: dateStr,
+                          start_time: scheduleMode === 'same' ? commonStartTime : '09:00',
+                          end_time: scheduleMode === 'same' ? commonEndTime : '17:00',
+                        };
+                        const allDays = [...scheduleDays.filter(d => d.date), newDay];
+                        const sorted = allDays.sort((a, b) => a.date.localeCompare(b.date)).map((d, i) => ({
+                          ...d,
+                          day_number: i + 1,
+                        }));
+                        setScheduleDays(sorted);
+                      }
+                    };
+                    
                     return (
                       <button
                         {...props}
                         type="button"
-                        onMouseDown={(e) => handleDayMouseDown(date, e)}
+                        onClick={handleClick}
+                        onMouseDown={(e) => {
+                          // Only start drag if not clicking to toggle
+                          if (!isSelected) {
+                            handleDayMouseDown(date, e);
+                          }
+                        }}
                         onMouseEnter={() => handleDayMouseEnter(date)}
                         className={`h-9 w-9 p-0 font-normal rounded-md transition-colors cursor-pointer
-                          ${isSelected ? 'bg-primary text-primary-foreground hover:bg-primary' : ''}
+                          ${isSelected ? 'bg-primary text-primary-foreground hover:bg-primary/80' : ''}
                           ${isInDragRange && !isSelected ? 'bg-primary/40 text-foreground' : ''}
                           ${!isSelected && !isInDragRange ? 'hover:bg-accent hover:text-accent-foreground' : ''}
                         `}
