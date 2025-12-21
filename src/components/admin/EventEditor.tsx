@@ -747,6 +747,20 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
           <div className="grid grid-cols-[auto_1fr] gap-4 border rounded-lg bg-muted/10">
             {/* Left: Calendar with drag-select */}
             <div className="border-r p-2 select-none">
+              <div className="flex items-center justify-between mb-2 px-1">
+                <span className="text-xs font-medium text-muted-foreground">Select dates</span>
+                {scheduleDays.some(d => d.date) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setScheduleDays([{ day_number: 1, date: '', start_time: commonStartTime, end_time: commonEndTime }])}
+                    className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </div>
               <Calendar
                 mode="multiple"
                 selected={scheduleDays.map(d => d.date ? new Date(d.date + 'T00:00:00') : undefined).filter(Boolean) as Date[]}
