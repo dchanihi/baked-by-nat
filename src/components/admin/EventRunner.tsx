@@ -949,69 +949,123 @@ export const EventRunner = ({
         </TabsContent>
 
         <TabsContent value="summary" className="space-y-4 mt-4">
-          {/* Event Totals - Compact Header */}
-          <div className="bg-gradient-to-r from-primary/10 to-pink-soft/10 rounded-xl border border-primary/20 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-base flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
+          {/* Event Totals - High Contrast Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border-2 border-primary/30 p-5 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-foreground">
+                <TrendingUp className="w-5 h-5 text-primary" />
                 Event Totals
               </h3>
-              <span className="text-xs text-muted-foreground">{currentDay} day{currentDay !== 1 ? 's' : ''}</span>
+              <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">{currentDay} day{currentDay !== 1 ? 's' : ''}</span>
             </div>
-            <div className="grid grid-cols-4 gap-3">
-              <div className="text-center">
-                <p className="text-xl font-bold text-green-600">${(allDaysRevenue + totalRevenue).toFixed(0)}</p>
-                <p className="text-xs text-muted-foreground">Revenue</p>
+            <div className="grid grid-cols-4 gap-4">
+              <div className="text-center p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
+                <p className="text-2xl font-bold text-green-600">${(allDaysRevenue + totalRevenue).toFixed(0)}</p>
+                <p className="text-xs text-green-700 dark:text-green-400 font-medium">Revenue</p>
               </div>
-              <div className="text-center">
-                <p className="text-xl font-bold">{allDaysItemsSold + totalItemsSold}</p>
-                <p className="text-xs text-muted-foreground">Sold</p>
+              <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                <p className="text-2xl font-bold text-blue-600">{allDaysItemsSold + totalItemsSold}</p>
+                <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">Sold</p>
               </div>
-              <div className="text-center">
-                <p className="text-xl font-bold text-primary">${totalProfit.toFixed(0)}</p>
-                <p className="text-xs text-muted-foreground">Profit</p>
+              <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
+                <p className="text-2xl font-bold text-purple-600">${totalProfit.toFixed(0)}</p>
+                <p className="text-xs text-purple-700 dark:text-purple-400 font-medium">Profit</p>
               </div>
-              <div className="text-center">
-                <p className="text-xl font-bold text-amber-600">${totalCOGS.toFixed(0)}</p>
-                <p className="text-xs text-muted-foreground">COGS</p>
+              <div className="text-center p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
+                <p className="text-2xl font-bold text-amber-600">${totalCOGS.toFixed(0)}</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">COGS</p>
               </div>
             </div>
           </div>
 
-          {/* Revenue Chart - Mini Bar Graph */}
+          {/* Revenue Chart - Line Graph */}
           {(daySummaries.length > 0 || currentDay > 0) && (
             <div className="bg-card rounded-xl border p-4">
               <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-green-600" />
                 Revenue by Day
               </h4>
-              <div className="flex items-end gap-1 h-20">
+              <div className="relative h-32">
                 {(() => {
                   const allDays = [
                     ...daySummaries.map(d => ({ day: d.day_number, revenue: d.revenue, items: d.items_sold, current: false })),
                     ...(currentDay > 0 ? [{ day: currentDay, revenue: totalRevenue, items: totalItemsSold, current: true }] : [])
                   ].sort((a, b) => a.day - b.day);
                   const maxRevenue = Math.max(...allDays.map(d => d.revenue), 1);
+                  const minRevenue = Math.min(...allDays.map(d => d.revenue));
+                  const range = maxRevenue - minRevenue || 1;
                   
-                  return allDays.map((d, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-                      <div 
-                        className={`w-full rounded-t transition-all ${d.current ? 'bg-green-500' : 'bg-green-400/70'} hover:opacity-80`}
-                        style={{ height: `${Math.max((d.revenue / maxRevenue) * 100, 8)}%` }}
-                      />
-                      <span className="text-[10px] text-muted-foreground">D{d.day}</span>
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-popover border rounded-md px-2 py-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-md">
-                        <p className="font-medium">${d.revenue.toFixed(2)}</p>
-                        <p className="text-muted-foreground">{d.items} items</p>
-                      </div>
-                    </div>
-                  ));
+                  // Calculate points for the line
+                  const points = allDays.map((d, i) => {
+                    const x = allDays.length === 1 ? 50 : (i / (allDays.length - 1)) * 100;
+                    const y = 100 - ((d.revenue - minRevenue) / range) * 80 - 10;
+                    return { x, y, ...d };
+                  });
+                  
+                  // Create SVG path
+                  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                  const areaPath = `${linePath} L ${points[points.length - 1].x} 95 L ${points[0].x} 95 Z`;
+                  
+                  return (
+                    <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                      {/* Grid lines */}
+                      <line x1="0" y1="25" x2="100" y2="25" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.3" />
+                      <line x1="0" y1="50" x2="100" y2="50" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.3" />
+                      <line x1="0" y1="75" x2="100" y2="75" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.3" />
+                      
+                      {/* Area fill */}
+                      <path d={areaPath} fill="url(#greenGradient)" opacity="0.3" />
+                      
+                      {/* Line */}
+                      <path d={linePath} fill="none" stroke="#22c55e" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" />
+                      
+                      {/* Points */}
+                      {points.map((p, i) => (
+                        <circle 
+                          key={i} 
+                          cx={p.x} 
+                          cy={p.y} 
+                          r="1.5" 
+                          fill={p.current ? '#22c55e' : '#4ade80'}
+                          stroke="white"
+                          strokeWidth="0.5"
+                        />
+                      ))}
+                      
+                      {/* Gradient definition */}
+                      <defs>
+                        <linearGradient id="greenGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#22c55e" />
+                          <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                  );
                 })()}
+                
+                {/* Labels */}
+                <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1">
+                  {(() => {
+                    const allDays = [
+                      ...daySummaries.map(d => ({ day: d.day_number, revenue: d.revenue, items: d.items_sold, current: false })),
+                      ...(currentDay > 0 ? [{ day: currentDay, revenue: totalRevenue, items: totalItemsSold, current: true }] : [])
+                    ].sort((a, b) => a.day - b.day);
+                    
+                    return allDays.map((d, i) => (
+                      <div key={i} className="text-center group relative">
+                        <span className={`text-[10px] ${d.current ? 'text-green-600 font-medium' : 'text-muted-foreground'}`}>D{d.day}</span>
+                        {/* Tooltip */}
+                        <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-popover border rounded-md px-2 py-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-md">
+                          <p className="font-medium text-green-600">${d.revenue.toFixed(2)}</p>
+                          <p className="text-muted-foreground">{d.items} items</p>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
             </div>
           )}
-
           {/* Daily Breakdown - Compact Cards */}
           <div className="space-y-2">
             {/* Current Day */}
