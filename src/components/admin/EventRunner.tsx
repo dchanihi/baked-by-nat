@@ -801,7 +801,7 @@ export const EventRunner = ({
                 <TrendingUp className="w-4 h-4" />
                 <span className="text-sm">Profit</span>
               </div>
-              <p className="text-2xl font-bold text-[#16a249]">${totalProfit.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-pink-accent">${totalProfit.toFixed(2)}</p>
             </div>
             <div className="bg-card rounded-lg p-4 border">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -967,9 +967,9 @@ export const EventRunner = ({
                 <p className="text-2xl font-bold text-blue-600">{allDaysItemsSold + totalItemsSold}</p>
                 <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">Sold</p>
               </div>
-              <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
-                <p className="text-2xl font-bold text-purple-600">${totalProfit.toFixed(0)}</p>
-                <p className="text-xs text-purple-700 dark:text-purple-400 font-medium">Profit</p>
+              <div className="text-center p-3 bg-pink-soft/20 rounded-lg">
+                <p className="text-2xl font-bold text-pink-accent">${totalProfit.toFixed(0)}</p>
+                <p className="text-xs text-pink-accent font-medium">Profit</p>
               </div>
               <div className="text-center p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
                 <p className="text-2xl font-bold text-amber-600">${totalCOGS.toFixed(0)}</p>
