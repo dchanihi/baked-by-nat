@@ -948,85 +948,177 @@ export const EventRunner = ({
           )}
         </TabsContent>
 
-        <TabsContent value="summary" className="space-y-6 mt-4">
-          {/* Current Day Summary */}
-          <div className="bg-card rounded-xl border p-6">
-            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-              <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">Current</span>
-              Day {currentDay}
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Open Time</p>
-                <p className="font-medium">
-                  {currentEvent.day_open_time ? format(new Date(currentEvent.day_open_time), 'h:mm a') : '-'}
-                </p>
+        <TabsContent value="summary" className="space-y-4 mt-4">
+          {/* Event Totals - Compact Header */}
+          <div className="bg-gradient-to-r from-primary/10 to-pink-soft/10 rounded-xl border border-primary/20 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-base flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                Event Totals
+              </h3>
+              <span className="text-xs text-muted-foreground">{currentDay} day{currentDay !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="text-center">
+                <p className="text-xl font-bold text-green-600">${(allDaysRevenue + totalRevenue).toFixed(0)}</p>
+                <p className="text-xs text-muted-foreground">Revenue</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Revenue</p>
-                <p className="font-medium text-green-600">${totalRevenue.toFixed(2)}</p>
+              <div className="text-center">
+                <p className="text-xl font-bold">{allDaysItemsSold + totalItemsSold}</p>
+                <p className="text-xs text-muted-foreground">Sold</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Items Sold</p>
-                <p className="font-medium">{totalItemsSold}</p>
+              <div className="text-center">
+                <p className="text-xl font-bold text-primary">${totalProfit.toFixed(0)}</p>
+                <p className="text-xs text-muted-foreground">Profit</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Profit</p>
-                <p className="font-medium text-primary">${totalProfit.toFixed(2)}</p>
+              <div className="text-center">
+                <p className="text-xl font-bold text-amber-600">${totalCOGS.toFixed(0)}</p>
+                <p className="text-xs text-muted-foreground">COGS</p>
               </div>
             </div>
           </div>
 
-          {/* Previous Days */}
-          {daySummaries.length > 0 && <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Previous Days</h3>
-              {daySummaries.map(day => <div key={day.id} className="bg-card rounded-xl border p-6">
-                  <h4 className="font-medium mb-4">Day {day.day_number}</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Open Time</p>
-                      <p className="font-medium">{format(new Date(day.open_time), 'h:mm a')}</p>
+          {/* Revenue Chart - Mini Bar Graph */}
+          {(daySummaries.length > 0 || currentDay > 0) && (
+            <div className="bg-card rounded-xl border p-4">
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-green-600" />
+                Revenue by Day
+              </h4>
+              <div className="flex items-end gap-1 h-20">
+                {(() => {
+                  const allDays = [
+                    ...daySummaries.map(d => ({ day: d.day_number, revenue: d.revenue, items: d.items_sold, current: false })),
+                    ...(currentDay > 0 ? [{ day: currentDay, revenue: totalRevenue, items: totalItemsSold, current: true }] : [])
+                  ].sort((a, b) => a.day - b.day);
+                  const maxRevenue = Math.max(...allDays.map(d => d.revenue), 1);
+                  
+                  return allDays.map((d, i) => (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+                      <div 
+                        className={`w-full rounded-t transition-all ${d.current ? 'bg-green-500' : 'bg-green-400/70'} hover:opacity-80`}
+                        style={{ height: `${Math.max((d.revenue / maxRevenue) * 100, 8)}%` }}
+                      />
+                      <span className="text-[10px] text-muted-foreground">D{d.day}</span>
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-popover border rounded-md px-2 py-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-md">
+                        <p className="font-medium">${d.revenue.toFixed(2)}</p>
+                        <p className="text-muted-foreground">{d.items} items</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Close Time</p>
-                      <p className="font-medium">
-                        {day.close_time ? format(new Date(day.close_time), 'h:mm a') : '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Revenue</p>
-                      <p className="font-medium text-green-600">${day.revenue.toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Items Sold</p>
-                      <p className="font-medium">{day.items_sold}</p>
+                  ));
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* Daily Breakdown - Compact Cards */}
+          <div className="space-y-2">
+            {/* Current Day */}
+            <div className="bg-card rounded-lg border p-3 flex items-center gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                <span className="text-xs font-bold text-green-600">{currentDay}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">Today</span>
+                  <span className="bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">Live</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {currentEvent.day_open_time ? format(new Date(currentEvent.day_open_time), 'h:mm a') : '-'} – now
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
+                <p className="text-[10px] text-muted-foreground">{totalItemsSold} sold</p>
+              </div>
+              <div className="w-16">
+                <div className="w-full bg-secondary rounded-full h-1.5">
+                  <div 
+                    className="bg-green-500 h-1.5 rounded-full transition-all" 
+                    style={{ width: `${Math.min((totalRevenue / Math.max(allDaysRevenue + totalRevenue, 1)) * 100, 100)}%` }} 
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Previous Days - Compact */}
+            {daySummaries.slice().reverse().map(day => {
+              const dayDuration = day.close_time 
+                ? Math.round((new Date(day.close_time).getTime() - new Date(day.open_time).getTime()) / (1000 * 60 * 60))
+                : 0;
+              const revenuePercent = Math.min((day.revenue / Math.max(allDaysRevenue + totalRevenue, 1)) * 100, 100);
+              
+              return (
+                <div key={day.id} className="bg-card rounded-lg border p-3 flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                    <span className="text-xs font-bold text-muted-foreground">{day.day_number}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium">Day {day.day_number}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {format(new Date(day.open_time), 'h:mm a')} – {day.close_time ? format(new Date(day.close_time), 'h:mm a') : '-'}
+                      {dayDuration > 0 && <span className="ml-1">({dayDuration}h)</span>}
                     </div>
                   </div>
-                </div>)}
-            </div>}
+                  <div className="text-right">
+                    <p className="text-sm font-bold">${day.revenue.toFixed(2)}</p>
+                    <p className="text-[10px] text-muted-foreground">{day.items_sold} sold</p>
+                  </div>
+                  <div className="w-16">
+                    <div className="w-full bg-secondary rounded-full h-1.5">
+                      <div 
+                        className="bg-primary/60 h-1.5 rounded-full transition-all" 
+                        style={{ width: `${revenuePercent}%` }} 
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-          {/* Event Totals */}
-          <div className="bg-primary/10 rounded-xl border border-primary/20 p-6">
-            <h3 className="font-semibold text-lg mb-4">Event Totals</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Days</p>
-                <p className="font-bold text-xl">{currentDay}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="font-bold text-xl text-green-600">${(allDaysRevenue + totalRevenue).toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Items Sold</p>
-                <p className="font-bold text-xl">{allDaysItemsSold + totalItemsSold}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Profit</p>
-                <p className="font-bold text-xl text-primary">${totalProfit.toFixed(2)}</p>
+          {/* Items Sold Distribution - Mini Visual */}
+          {items.length > 0 && (
+            <div className="bg-card rounded-xl border p-4">
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Package className="w-4 h-4 text-primary" />
+                Top Sellers
+              </h4>
+              <div className="space-y-2">
+                {items
+                  .filter(item => item.quantity_sold > 0)
+                  .sort((a, b) => b.quantity_sold - a.quantity_sold)
+                  .slice(0, 5)
+                  .map(item => {
+                    const maxSold = Math.max(...items.map(i => i.quantity_sold), 1);
+                    const percent = (item.quantity_sold / maxSold) * 100;
+                    const CategoryIcon = getCategoryIcon(item.category);
+                    
+                    return (
+                      <div key={item.id} className="flex items-center gap-2">
+                        <CategoryIcon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between text-xs mb-0.5">
+                            <span className="truncate font-medium">{item.name}</span>
+                            <span className="text-muted-foreground ml-2">{item.quantity_sold}</span>
+                          </div>
+                          <div className="w-full bg-secondary rounded-full h-1">
+                            <div 
+                              className="bg-pink-soft h-1 rounded-full transition-all" 
+                              style={{ width: `${percent}%` }} 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {items.filter(item => item.quantity_sold > 0).length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">No sales yet</p>
+                )}
               </div>
             </div>
-          </div>
+          )}
         </TabsContent>
       </Tabs>
 
