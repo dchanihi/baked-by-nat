@@ -802,6 +802,22 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                     const isSelected = scheduleDays.some(d => d.date === dateStr);
                     const isInDragRange = getDragRangeDates().has(dateStr);
                     
+                    // Check if adjacent dates are selected for connected styling
+                    const prevDate = new Date(date);
+                    prevDate.setDate(prevDate.getDate() - 1);
+                    const nextDate = new Date(date);
+                    nextDate.setDate(nextDate.getDate() + 1);
+                    const prevDateStr = format(prevDate, 'yyyy-MM-dd');
+                    const nextDateStr = format(nextDate, 'yyyy-MM-dd');
+                    const hasPrevSelected = scheduleDays.some(d => d.date === prevDateStr);
+                    const hasNextSelected = scheduleDays.some(d => d.date === nextDateStr);
+                    
+                    // Determine position in range for styling
+                    const isRangeStart = isSelected && !hasPrevSelected && hasNextSelected;
+                    const isRangeEnd = isSelected && hasPrevSelected && !hasNextSelected;
+                    const isRangeMiddle = isSelected && hasPrevSelected && hasNextSelected;
+                    const isSingle = isSelected && !hasPrevSelected && !hasNextSelected;
+                    
                     const handleClick = (e: React.MouseEvent) => {
                       e.preventDefault();
                       if (isSelected) {
@@ -832,6 +848,13 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                       }
                     };
                     
+                    // Build rounded corners based on position
+                    let roundedClasses = 'rounded-md';
+                    if (isRangeStart) roundedClasses = 'rounded-l-md rounded-r-none';
+                    else if (isRangeEnd) roundedClasses = 'rounded-r-md rounded-l-none';
+                    else if (isRangeMiddle) roundedClasses = 'rounded-none';
+                    else if (isSingle) roundedClasses = 'rounded-md';
+                    
                     return (
                       <button
                         {...props}
@@ -844,10 +867,11 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                           }
                         }}
                         onMouseEnter={() => handleDayMouseEnter(date)}
-                        className={`h-9 w-9 p-0 font-normal rounded-md transition-colors cursor-pointer
+                        className={`h-9 w-9 p-0 font-normal transition-colors cursor-pointer
+                          ${roundedClasses}
                           ${isSelected ? 'bg-primary text-primary-foreground hover:bg-primary/80' : ''}
-                          ${isInDragRange && !isSelected ? 'bg-primary/40 text-foreground' : ''}
-                          ${!isSelected && !isInDragRange ? 'hover:bg-accent hover:text-accent-foreground' : ''}
+                          ${isInDragRange && !isSelected ? 'bg-primary/40 text-foreground rounded-md' : ''}
+                          ${!isSelected && !isInDragRange ? 'hover:bg-accent hover:text-accent-foreground rounded-md' : ''}
                         `}
                       >
                         {date.getDate()}
