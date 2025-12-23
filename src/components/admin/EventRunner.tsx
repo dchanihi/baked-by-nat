@@ -1125,7 +1125,7 @@ export const EventRunner = ({
 
             {/* Right Side - Cart Sidebar (Desktop) */}
             <div className="hidden lg:block w-80">
-              <div className="sticky top-4 h-[calc(100vh-8rem)] rounded-xl overflow-hidden border bg-card">
+              <div className="sticky top-4 h-[calc(100vh-12rem)] rounded-xl overflow-hidden border bg-card">
                 <CartSidebar />
               </div>
             </div>
