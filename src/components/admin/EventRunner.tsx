@@ -285,8 +285,19 @@ export const EventRunner = ({
       result = result.filter(item => item.category === selectedCategory);
     }
 
-    // Sort items
+    // Sort items - out of stock items go to the bottom
     result.sort((a, b) => {
+      const aRemaining = a.starting_quantity - a.quantity_sold;
+      const bRemaining = b.starting_quantity - b.quantity_sold;
+      const aOutOfStock = aRemaining <= 0;
+      const bOutOfStock = bRemaining <= 0;
+
+      // First, sort by stock status (in-stock first, out-of-stock last)
+      if (aOutOfStock !== bOutOfStock) {
+        return aOutOfStock ? 1 : -1;
+      }
+
+      // Then apply the selected sort within each group
       switch (sortBy) {
         case 'name':
           return a.name.localeCompare(b.name);
@@ -297,7 +308,7 @@ export const EventRunner = ({
         case 'price-desc':
           return b.price - a.price;
         case 'remaining':
-          return b.starting_quantity - b.quantity_sold - (a.starting_quantity - a.quantity_sold);
+          return bRemaining - aRemaining;
         default:
           return 0;
       }
