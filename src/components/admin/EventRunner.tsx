@@ -1341,7 +1341,7 @@ export const EventRunner = ({
                             {format(new Date(order.created_at), 'h:mm a')}
                           </span>
                         </div>
-                        <span className="font-bold text-primary">${order.total.toFixed(2)}</span>
+                        <span className="font-bold text-lg bg-green-500 text-white px-2 py-0.5 rounded">${order.total.toFixed(2)}</span>
                       </div>
                       <div className="space-y-1.5">
                         {order.items.map((item, itemIndex) => (
