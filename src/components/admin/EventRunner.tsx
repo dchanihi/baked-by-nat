@@ -4,12 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3, Search, Filter, X } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3, Search, Filter, X, ShoppingCart, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getIconComponent } from '@/lib/categoryIcons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface EventItem {
   id: string;
@@ -20,6 +24,16 @@ interface EventItem {
   quantity_sold: number;
   category: string | null;
 }
+
+interface CartItem {
+  itemId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  category: string | null;
+  cogs: number;
+}
+
 interface Event {
   id: string;
   name: string;
@@ -32,6 +46,7 @@ interface Event {
   day_open_time?: string | null;
   day_close_time?: string | null;
 }
+
 interface DaySummary {
   id: string;
   day_number: number;
@@ -40,12 +55,14 @@ interface DaySummary {
   revenue: number;
   items_sold: number;
 }
+
 interface EventRunnerProps {
   event: Event;
   onBack: () => void;
   onUpdate: () => void;
   onEdit?: () => void;
 }
+
 export const EventRunner = ({
   event,
   onBack,
@@ -66,6 +83,11 @@ export const EventRunner = ({
   const [activeTab, setActiveTab] = useState('sales');
   const [categoryIconMap, setCategoryIconMap] = useState<Record<string, string>>({});
   const [allCategories, setAllCategories] = useState<{name: string; icon: string | null}[]>([]);
+  
+  // Cart state for POS
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
   
   // Add new item state
   const [showAddItem, setShowAddItem] = useState(false);
@@ -98,6 +120,154 @@ export const EventRunner = ({
     if (!categoryName) return getIconComponent(null);
     const iconName = categoryIconMap[categoryName];
     return getIconComponent(iconName || null);
+  };
+  
+  // Cart calculations
+  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  
+  // Cart operations
+  const addToCart = (item: EventItem) => {
+    const remaining = item.starting_quantity - item.quantity_sold;
+    const existingCartItem = cart.find(c => c.itemId === item.id);
+    const currentInCart = existingCartItem?.quantity || 0;
+    
+    if (currentInCart >= remaining) {
+      toast({
+        title: 'Not enough stock',
+        description: `Only ${remaining} available.`,
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (existingCartItem) {
+      setCart(cart.map(c => 
+        c.itemId === item.id 
+          ? { ...c, quantity: c.quantity + 1 }
+          : c
+      ));
+    } else {
+      setCart([...cart, {
+        itemId: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: 1,
+        category: item.category,
+        cogs: item.cogs
+      }]);
+    }
+  };
+  
+  const removeFromCart = (itemId: string) => {
+    setCart(cart.filter(c => c.itemId !== itemId));
+  };
+  
+  const updateCartQuantity = (itemId: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeFromCart(itemId);
+      return;
+    }
+    
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    
+    const remaining = item.starting_quantity - item.quantity_sold;
+    if (quantity > remaining) {
+      toast({
+        title: 'Not enough stock',
+        description: `Only ${remaining} available.`,
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    setCart(cart.map(c => 
+      c.itemId === itemId 
+        ? { ...c, quantity }
+        : c
+    ));
+  };
+  
+  const clearCart = () => {
+    setCart([]);
+  };
+  
+  const checkout = async () => {
+    if (cart.length === 0) return;
+    
+    setIsCheckingOut(true);
+    
+    try {
+      // Validate all items still have sufficient inventory
+      for (const cartItem of cart) {
+        const item = items.find(i => i.id === cartItem.itemId);
+        if (!item) {
+          throw new Error(`Item ${cartItem.name} not found`);
+        }
+        const remaining = item.starting_quantity - item.quantity_sold;
+        if (cartItem.quantity > remaining) {
+          throw new Error(`Not enough ${cartItem.name}. Only ${remaining} left.`);
+        }
+      }
+      
+      // Update inventory and create sales records
+      for (const cartItem of cart) {
+        const item = items.find(i => i.id === cartItem.itemId)!;
+        const newQuantitySold = item.quantity_sold + cartItem.quantity;
+        
+        // Update quantity_sold
+        const { error: updateError } = await supabase
+          .from('event_items')
+          .update({ quantity_sold: newQuantitySold })
+          .eq('id', cartItem.itemId);
+        
+        if (updateError) throw updateError;
+        
+        // Record sale
+        const { error: saleError } = await supabase
+          .from('event_sales')
+          .insert({
+            event_item_id: cartItem.itemId,
+            quantity: cartItem.quantity,
+            unit_price: cartItem.price,
+            total_price: cartItem.price * cartItem.quantity
+          });
+        
+        if (saleError) throw saleError;
+        
+        // Update local state
+        setItems(prev => prev.map(i => 
+          i.id === cartItem.itemId 
+            ? { ...i, quantity_sold: newQuantitySold }
+            : i
+        ));
+      }
+      
+      toast({
+        title: 'Sale Complete!',
+        description: `${cartItemCount} items • $${cartTotal.toFixed(2)}`
+      });
+      
+      clearCart();
+      setMobileCartOpen(false);
+      
+    } catch (error: any) {
+      toast({
+        title: 'Checkout Failed',
+        description: error.message || 'Failed to process sale.',
+        variant: 'destructive'
+      });
+      // Reload items to get fresh data
+      loadItems();
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+  
+  // Get cart quantity for an item
+  const getCartQuantity = (itemId: string) => {
+    return cart.find(c => c.itemId === itemId)?.quantity || 0;
   };
   
   // Filtered and sorted items
@@ -135,6 +305,7 @@ export const EventRunner = ({
     
     return result;
   }, [items, searchQuery, selectedCategory, sortBy]);
+
   useEffect(() => {
     loadItems();
     loadEventDetails();
@@ -215,11 +386,9 @@ export const EventRunner = ({
       description: `${newItemName} has been added to the inventory.`
     });
   };
+
   const loadEventDetails = async () => {
-    const {
-      data,
-      error
-    } = await supabase.from('events').select('*').eq('id', event.id).maybeSingle();
+    const { data, error } = await supabase.from('events').select('*').eq('id', event.id).maybeSingle();
     if (data) {
       setCurrentEvent(data as Event);
       // Show start confirmation if day isn't active
@@ -228,11 +397,9 @@ export const EventRunner = ({
       }
     }
   };
+
   const loadItems = async () => {
-    const {
-      data,
-      error
-    } = await supabase.from('event_items').select('*').eq('event_id', event.id);
+    const { data, error } = await supabase.from('event_items').select('*').eq('event_id', event.id);
     if (error) {
       toast({
         title: 'Error',
@@ -259,11 +426,9 @@ export const EventRunner = ({
     }
     setLoading(false);
   };
+
   const loadDaySummaries = async () => {
-    const {
-      data,
-      error
-    } = await supabase.from('event_day_summaries').select('*').eq('event_id', event.id).order('day_number', {
+    const { data, error } = await supabase.from('event_day_summaries').select('*').eq('event_id', event.id).order('day_number', {
       ascending: true
     });
     if (!error && data) {
@@ -277,12 +442,11 @@ export const EventRunner = ({
       })));
     }
   };
+
   const startDay = async () => {
     const newDay = (currentEvent.current_day || 0) + 1;
     const openTime = new Date().toISOString();
-    const {
-      error
-    } = await supabase.from('events').update({
+    const { error } = await supabase.from('events').update({
       status: 'active',
       current_day: newDay,
       day_open_time: openTime,
@@ -311,6 +475,7 @@ export const EventRunner = ({
       description: `Event opened at ${format(new Date(openTime), 'h:mm a')}`
     });
   };
+
   const endDay = async () => {
     const closeTime = new Date().toISOString();
 
@@ -327,9 +492,7 @@ export const EventRunner = ({
       revenue: dayRevenue,
       items_sold: dayItemsSold
     });
-    const {
-      error
-    } = await supabase.from('events').update({
+    const { error } = await supabase.from('events').update({
       day_close_time: closeTime
     }).eq('id', event.id);
     if (error) {
@@ -353,6 +516,7 @@ export const EventRunner = ({
       description: `Event closed at ${format(new Date(closeTime), 'h:mm a')}`
     });
   };
+
   const saveInventoryEdits = async () => {
     const updates = Object.entries(inventoryEdits).map(([id, quantity]) => ({
       id,
@@ -370,73 +534,7 @@ export const EventRunner = ({
       description: 'Starting quantities have been updated for the next day.'
     });
   };
-  const recordSale = async (itemId: string, quantity: number) => {
-    const item = items.find(i => i.id === itemId);
-    if (!item) return;
-    const remaining = item.starting_quantity - item.quantity_sold;
-    if (quantity > remaining) {
-      toast({
-        title: 'Not enough inventory',
-        description: `Only ${remaining} left in stock.`,
-        variant: 'destructive'
-      });
-      return;
-    }
-    const newQuantitySold = item.quantity_sold + quantity;
-    setItems(items.map(i => i.id === itemId ? {
-      ...i,
-      quantity_sold: newQuantitySold
-    } : i));
-    const {
-      error: updateError
-    } = await supabase.from('event_items').update({
-      quantity_sold: newQuantitySold
-    }).eq('id', itemId);
-    if (updateError) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update inventory.',
-        variant: 'destructive'
-      });
-      loadItems();
-      return;
-    }
-    await supabase.from('event_sales').insert({
-      event_item_id: itemId,
-      quantity,
-      unit_price: item.price,
-      total_price: item.price * quantity
-    });
-  };
-  const handleQuickSale = (itemId: string) => {
-    recordSale(itemId, 1);
-  };
-  const handleQuickRemove = async (itemId: string) => {
-    const item = items.find(i => i.id === itemId);
-    if (!item || item.quantity_sold <= 0) return;
-    const newQuantitySold = item.quantity_sold - 1;
-    setItems(items.map(i => i.id === itemId ? {
-      ...i,
-      quantity_sold: newQuantitySold
-    } : i));
-    await supabase.from('event_items').update({
-      quantity_sold: newQuantitySold
-    }).eq('id', itemId);
-    const {
-      data: recentSale
-    } = await supabase.from('event_sales').select('id').eq('event_item_id', itemId).order('created_at', {
-      ascending: false
-    }).limit(1).maybeSingle();
-    if (recentSale) {
-      await supabase.from('event_sales').delete().eq('id', recentSale.id);
-    }
-  };
-  const handleManualSale = () => {
-    if (!manualSaleItem || manualQuantity <= 0) return;
-    recordSale(manualSaleItem.id, manualQuantity);
-    setManualSaleItem(null);
-    setManualQuantity(1);
-  };
+
   const completeEvent = async () => {
     const closeTime = new Date().toISOString();
 
@@ -474,11 +572,124 @@ export const EventRunner = ({
   // Calculate totals from all day summaries
   const allDaysRevenue = daySummaries.reduce((sum, d) => sum + d.revenue, 0);
   const allDaysItemsSold = daySummaries.reduce((sum, d) => sum + d.items_sold, 0);
+
   if (loading) {
     return <div className="flex items-center justify-center py-12">
         <p className="text-muted-foreground">Loading...</p>
       </div>;
   }
+
+  // Cart Sidebar Component
+  const CartSidebar = ({ isMobile = false }: { isMobile?: boolean }) => (
+    <div className={`flex flex-col h-full ${isMobile ? '' : 'bg-card border-l'}`}>
+      {/* Cart Header */}
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold flex items-center gap-2">
+            <ShoppingCart className="w-5 h-5" />
+            Current Order
+          </h3>
+          {cart.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:text-destructive">
+              <Trash2 className="w-4 h-4 mr-1" />
+              Clear
+            </Button>
+          )}
+        </div>
+      </div>
+      
+      {/* Cart Items */}
+      <ScrollArea className="flex-1 p-4">
+        {cart.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="font-medium">Cart is empty</p>
+            <p className="text-sm">Tap items to add them</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <AnimatePresence mode="popLayout">
+              {cart.map((cartItem) => {
+                const CategoryIcon = getCategoryIcon(cartItem.category);
+                return (
+                  <motion.div
+                    key={cartItem.itemId}
+                    layout
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: 50 }}
+                    className="bg-secondary/50 rounded-lg p-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-pink-soft/10 flex items-center justify-center flex-shrink-0">
+                        <CategoryIcon className="w-5 h-5 text-pink-soft" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{cartItem.name}</p>
+                        <p className="text-sm text-muted-foreground">${cartItem.price.toFixed(2)} each</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFromCart(cartItem.itemId)}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateCartQuantity(cartItem.itemId, cartItem.quantity - 1)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </Button>
+                        <span className="w-8 text-center font-medium">{cartItem.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateCartQuantity(cartItem.itemId, cartItem.quantity + 1)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <span className="font-semibold">${(cartItem.price * cartItem.quantity).toFixed(2)}</span>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        )}
+      </ScrollArea>
+      
+      {/* Cart Footer */}
+      <div className="p-4 border-t space-y-4 bg-background">
+        <div className="flex items-center justify-between text-lg font-bold">
+          <span>Total</span>
+          <span className="text-primary">${cartTotal.toFixed(2)}</span>
+        </div>
+        <Button 
+          onClick={checkout}
+          disabled={cart.length === 0 || isCheckingOut}
+          className="w-full bg-pink-soft hover:bg-pink-medium text-white py-6 text-lg"
+        >
+          {isCheckingOut ? (
+            'Processing...'
+          ) : (
+            <>
+              <CheckCircle className="w-5 h-5 mr-2" />
+              Checkout ({cartItemCount} items)
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
 
   // Start Confirmation Screen (with inventory editing for multi-day events)
   if (showStartConfirm) {
@@ -731,7 +942,9 @@ export const EventRunner = ({
         </div>
       </div>;
   }
-  return <div className="space-y-6">
+
+  return <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={onBack}>
@@ -771,7 +984,7 @@ export const EventRunner = ({
         <TabsList>
           <TabsTrigger value="sales">
             <Package className="w-4 h-4 mr-2" />
-            Sales
+            POS
           </TabsTrigger>
           <TabsTrigger value="summary">
             <BarChart3 className="w-4 h-4 mr-2" />
@@ -779,173 +992,183 @@ export const EventRunner = ({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="sales" className="space-y-6 mt-4">
-          {/* Metrics Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-card rounded-lg p-4 border">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <DollarSign className="w-4 h-4" />
-                <span className="text-sm">COGS</span>
+        <TabsContent value="sales" className="mt-4">
+          {/* POS Layout - Two Column */}
+          <div className="flex gap-6">
+            {/* Left Side - Item Tiles */}
+            <div className="flex-1 space-y-4">
+              {/* Metrics Cards - Compact */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="bg-card rounded-lg p-3 border">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span className="text-xs">Revenue</span>
+                  </div>
+                  <p className="text-xl font-bold text-primary">${totalRevenue.toFixed(2)}</p>
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span className="text-xs">Profit</span>
+                  </div>
+                  <p className="text-xl font-bold text-pink-accent">${totalProfit.toFixed(2)}</p>
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                    <Package className="w-3.5 h-3.5" />
+                    <span className="text-xs">Sold</span>
+                  </div>
+                  <p className="text-xl font-bold">{totalItemsSold}</p>
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span className="text-xs">COGS</span>
+                  </div>
+                  <p className="text-xl font-bold text-muted-foreground">${totalCOGS.toFixed(2)}</p>
+                </div>
               </div>
-              <p className="text-2xl font-bold text-muted-foreground">${totalCOGS.toFixed(2)}</p>
-            </div>
-            <div className="bg-card rounded-lg p-4 border">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <DollarSign className="w-4 h-4" />
-                <span className="text-sm">Revenue</span>
-              </div>
-              <p className="text-2xl font-bold text-primary">${totalRevenue.toFixed(2)}</p>
-            </div>
-            <div className="bg-card rounded-lg p-4 border">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <TrendingUp className="w-4 h-4" />
-                <span className="text-sm">Profit</span>
-              </div>
-              <p className="text-2xl font-bold text-pink-accent">${totalProfit.toFixed(2)}</p>
-            </div>
-            <div className="bg-card rounded-lg p-4 border">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Package className="w-4 h-4" />
-                <span className="text-sm">Items Sold</span>
-              </div>
-              <p className="text-2xl font-bold">{totalItemsSold} / {totalInventory}</p>
-            </div>
-          </div>
 
-          {/* Search and Filter Controls */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search items..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-9"
-              />
-              {searchQuery && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                  onClick={() => setSearchQuery('')}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
-            
-            {/* Category Filter */}
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-full sm:w-48">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(cat => {
-                  const IconComponent = getCategoryIcon(cat);
+              {/* Search and Filter Controls */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Search */}
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search items..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 pr-9"
+                  />
+                  {searchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                      onClick={() => setSearchQuery('')}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Category Filter */}
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map(cat => {
+                      const IconComponent = getCategoryIcon(cat);
+                      return (
+                        <SelectItem key={cat} value={cat}>
+                          <div className="flex items-center gap-2">
+                            <IconComponent className="w-4 h-4" />
+                            <span className="capitalize">{cat}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* POS Item Tiles Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {filteredItems.map(item => {
+                  const remaining = item.starting_quantity - item.quantity_sold;
+                  const cartQty = getCartQuantity(item.id);
+                  const isOutOfStock = remaining <= 0;
+                  const CategoryIcon = getCategoryIcon(item.category);
+                  
                   return (
-                    <SelectItem key={cat} value={cat}>
-                      <div className="flex items-center gap-2">
-                        <IconComponent className="w-4 h-4" />
-                        <span className="capitalize">{cat}</span>
+                    <motion.button
+                      key={item.id}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => !isOutOfStock && addToCart(item)}
+                      disabled={isOutOfStock}
+                      className={`relative aspect-square p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center
+                        ${isOutOfStock 
+                          ? 'bg-muted/50 border-muted cursor-not-allowed opacity-60' 
+                          : 'bg-card border-border hover:border-pink-soft hover:shadow-lg cursor-pointer active:bg-pink-soft/10'
+                        }
+                        ${cartQty > 0 ? 'border-pink-soft bg-pink-soft/5' : ''}
+                      `}
+                    >
+                      {/* Cart Badge */}
+                      {cartQty > 0 && (
+                        <Badge className="absolute -top-2 -right-2 bg-pink-soft hover:bg-pink-soft text-white h-6 w-6 p-0 flex items-center justify-center rounded-full text-xs font-bold">
+                          {cartQty}
+                        </Badge>
+                      )}
+                      
+                      {/* Category Icon */}
+                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${isOutOfStock ? 'bg-muted' : 'bg-pink-soft/10'}`}>
+                        <CategoryIcon className={`w-8 h-8 ${isOutOfStock ? 'text-muted-foreground' : 'text-pink-soft'}`} />
                       </div>
-                    </SelectItem>
+                      
+                      {/* Item Name */}
+                      <span className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</span>
+                      
+                      {/* Price */}
+                      <span className="text-lg font-bold text-primary">${item.price.toFixed(2)}</span>
+                      
+                      {/* Remaining */}
+                      <span className={`text-xs ${isOutOfStock ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                        {isOutOfStock ? 'Out of stock' : `${remaining} left`}
+                      </span>
+                    </motion.button>
                   );
                 })}
-              </SelectContent>
-            </Select>
-            
-            {/* Sort */}
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-44">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name (A-Z)</SelectItem>
-                <SelectItem value="category">Category</SelectItem>
-                <SelectItem value="price-asc">Price (Low-High)</SelectItem>
-                <SelectItem value="price-desc">Price (High-Low)</SelectItem>
-                <SelectItem value="remaining">Most Remaining</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              </div>
 
-          {/* Items Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredItems.map(item => {
-              const remaining = item.starting_quantity - item.quantity_sold;
-              const itemRevenue = item.price * item.quantity_sold;
-              const soldPercentage = item.starting_quantity > 0 ? item.quantity_sold / item.starting_quantity * 100 : 0;
-              const CategoryIcon = getCategoryIcon(item.category);
-              
-              return (
-                <div key={item.id} className="bg-card rounded-lg p-4 border space-y-3">
-                  <div className="flex gap-3">
-                    {/* Category Icon */}
-                    <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-pink-soft/10 flex items-center justify-center">
-                      <CategoryIcon className="w-7 h-7 text-pink-soft" />
-                    </div>
-                    
-                    {/* Item Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold truncate">{item.name}</h3>
-                          <p className="text-sm text-muted-foreground">${item.price.toFixed(2)} each</p>
-                        </div>
-                        <div className="text-right ml-2">
-                          <p className="font-bold text-green-600">${itemRevenue.toFixed(2)}</p>
-                          <p className="text-xs text-muted-foreground">{item.quantity_sold} sold</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <div className="bg-pink-soft h-2 rounded-full transition-all" style={{
-                      width: `${soldPercentage}%`
-                    }} />
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{remaining} remaining</span>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleQuickRemove(item.id)} disabled={item.quantity_sold <= 0}>
-                        <Minus className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" onClick={() => handleQuickSale(item.id)} disabled={remaining <= 0} className="bg-pink-soft hover:bg-pink-medium">
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => {
-                        setManualSaleItem(item);
-                        setManualQuantity(1);
-                      }} disabled={remaining <= 0}>
-                        +#
-                      </Button>
-                    </div>
-                  </div>
+              {filteredItems.length === 0 && items.length > 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p>No items match your search or filter.</p>
+                  <Button variant="link" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); }}>
+                    Clear filters
+                  </Button>
                 </div>
-              );
-            })}
+              )}
+
+              {items.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p>No items in this event. Go back and add some inventory first.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Right Side - Cart Sidebar (Desktop) */}
+            <div className="hidden lg:block w-80">
+              <div className="sticky top-4 h-[calc(100vh-8rem)] rounded-xl overflow-hidden border bg-card">
+                <CartSidebar />
+              </div>
+            </div>
           </div>
 
-          {filteredItems.length === 0 && items.length > 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>No items match your search or filter.</p>
-              <Button variant="link" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); }}>
-                Clear filters
-              </Button>
-            </div>
-          )}
-
-          {items.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>No items in this event. Go back and add some inventory first.</p>
-            </div>
-          )}
+          {/* Mobile Cart Floating Button */}
+          <div className="lg:hidden fixed bottom-6 right-6 z-50">
+            <Sheet open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
+              <SheetTrigger asChild>
+                <Button 
+                  size="lg" 
+                  className="h-16 w-16 rounded-full bg-pink-soft hover:bg-pink-medium shadow-lg relative"
+                >
+                  <ShoppingCart className="w-6 h-6" />
+                  {cartItemCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 bg-primary hover:bg-primary text-primary-foreground h-6 min-w-6 p-0 flex items-center justify-center rounded-full text-xs font-bold">
+                      {cartItemCount}
+                    </Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:w-96 p-0">
+                <CartSidebar isMobile />
+              </SheetContent>
+            </Sheet>
+          </div>
         </TabsContent>
 
         <TabsContent value="summary" className="space-y-4 mt-4">
@@ -1066,6 +1289,7 @@ export const EventRunner = ({
               </div>
             </div>
           )}
+
           {/* Daily Breakdown - Compact Cards */}
           <div className="space-y-2">
             {/* Current Day */}
@@ -1180,7 +1404,7 @@ export const EventRunner = ({
       <Dialog open={!!manualSaleItem} onOpenChange={() => setManualSaleItem(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Record Sale: {manualSaleItem?.name}</DialogTitle>
+            <DialogTitle>Add to Cart: {manualSaleItem?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1195,8 +1419,16 @@ export const EventRunner = ({
             <Button variant="outline" onClick={() => setManualSaleItem(null)}>
               Cancel
             </Button>
-            <Button onClick={handleManualSale} className="bg-pink-soft hover:bg-pink-medium">
-              Record Sale
+            <Button onClick={() => {
+              if (manualSaleItem) {
+                for (let i = 0; i < manualQuantity; i++) {
+                  addToCart(manualSaleItem);
+                }
+              }
+              setManualSaleItem(null);
+              setManualQuantity(1);
+            }} className="bg-pink-soft hover:bg-pink-medium">
+              Add to Cart
             </Button>
           </DialogFooter>
         </DialogContent>
