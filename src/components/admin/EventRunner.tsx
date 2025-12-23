@@ -14,7 +14,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
 interface EventItem {
   id: string;
   name: string;
@@ -24,7 +23,6 @@ interface EventItem {
   quantity_sold: number;
   category: string | null;
 }
-
 interface CartItem {
   itemId: string;
   name: string;
@@ -33,7 +31,6 @@ interface CartItem {
   category: string | null;
   cogs: number;
 }
-
 interface Event {
   id: string;
   name: string;
@@ -46,7 +43,6 @@ interface Event {
   day_open_time?: string | null;
   day_close_time?: string | null;
 }
-
 interface DaySummary {
   id: string;
   day_number: number;
@@ -55,14 +51,12 @@ interface DaySummary {
   revenue: number;
   items_sold: number;
 }
-
 interface EventRunnerProps {
   event: Event;
   onBack: () => void;
   onUpdate: () => void;
   onEdit?: () => void;
 }
-
 export const EventRunner = ({
   event,
   onBack,
@@ -82,14 +76,17 @@ export const EventRunner = ({
   const [inventoryEdits, setInventoryEdits] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState('sales');
   const [categoryIconMap, setCategoryIconMap] = useState<Record<string, string>>({});
-  const [allCategories, setAllCategories] = useState<{name: string; icon: string | null}[]>([]);
-  
+  const [allCategories, setAllCategories] = useState<{
+    name: string;
+    icon: string | null;
+  }[]>([]);
+
   // Cart state for POS
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [orderCount, setOrderCount] = useState(0);
-  
+
   // Add new item state
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItemName, setNewItemName] = useState('');
@@ -97,17 +94,22 @@ export const EventRunner = ({
   const [newItemCogs, setNewItemCogs] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('');
-  
+
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
-  
+
   // Order history state
   interface OrderHistoryItem {
     order_id: string;
     created_at: string;
-    items: { name: string; quantity: number; unit_price: number; total_price: number }[];
+    items: {
+      name: string;
+      quantity: number;
+      unit_price: number;
+      total_price: number;
+    }[];
     total: number;
   }
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
@@ -116,7 +118,7 @@ export const EventRunner = ({
   // Determine if we need to show the start confirmation
   const isDayActive = currentEvent.day_open_time && !currentEvent.day_close_time;
   const currentDay = currentEvent.current_day || 0;
-  
+
   // Get unique categories from items
   const categories = useMemo(() => {
     const cats = new Set<string>();
@@ -125,24 +127,23 @@ export const EventRunner = ({
     });
     return Array.from(cats).sort();
   }, [items]);
-  
+
   // Helper to get the icon for a category name
   const getCategoryIcon = (categoryName: string | null) => {
     if (!categoryName) return getIconComponent(null);
     const iconName = categoryIconMap[categoryName];
     return getIconComponent(iconName || null);
   };
-  
+
   // Cart calculations
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  
+
   // Cart operations
   const addToCart = (item: EventItem) => {
     const remaining = item.starting_quantity - item.quantity_sold;
     const existingCartItem = cart.find(c => c.itemId === item.id);
     const currentInCart = existingCartItem?.quantity || 0;
-    
     if (currentInCart >= remaining) {
       toast({
         title: 'Not enough stock',
@@ -151,13 +152,11 @@ export const EventRunner = ({
       });
       return;
     }
-    
     if (existingCartItem) {
-      setCart(cart.map(c => 
-        c.itemId === item.id 
-          ? { ...c, quantity: c.quantity + 1 }
-          : c
-      ));
+      setCart(cart.map(c => c.itemId === item.id ? {
+        ...c,
+        quantity: c.quantity + 1
+      } : c));
     } else {
       setCart([...cart, {
         itemId: item.id,
@@ -169,20 +168,16 @@ export const EventRunner = ({
       }]);
     }
   };
-  
   const removeFromCart = (itemId: string) => {
     setCart(cart.filter(c => c.itemId !== itemId));
   };
-  
   const updateCartQuantity = (itemId: string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(itemId);
       return;
     }
-    
     const item = items.find(i => i.id === itemId);
     if (!item) return;
-    
     const remaining = item.starting_quantity - item.quantity_sold;
     if (quantity > remaining) {
       toast({
@@ -192,23 +187,17 @@ export const EventRunner = ({
       });
       return;
     }
-    
-    setCart(cart.map(c => 
-      c.itemId === itemId 
-        ? { ...c, quantity }
-        : c
-    ));
+    setCart(cart.map(c => c.itemId === itemId ? {
+      ...c,
+      quantity
+    } : c));
   };
-  
   const clearCart = () => {
     setCart([]);
   };
-  
   const checkout = async () => {
     if (cart.length === 0) return;
-    
     setIsCheckingOut(true);
-    
     try {
       // Validate all items still have sufficient inventory
       for (const cartItem of cart) {
@@ -221,54 +210,48 @@ export const EventRunner = ({
           throw new Error(`Not enough ${cartItem.name}. Only ${remaining} left.`);
         }
       }
-      
+
       // Generate a unique order_id for this transaction
       const orderId = crypto.randomUUID();
-      
+
       // Update inventory and create sales records
       for (const cartItem of cart) {
         const item = items.find(i => i.id === cartItem.itemId)!;
         const newQuantitySold = item.quantity_sold + cartItem.quantity;
-        
+
         // Update quantity_sold
-        const { error: updateError } = await supabase
-          .from('event_items')
-          .update({ quantity_sold: newQuantitySold })
-          .eq('id', cartItem.itemId);
-        
+        const {
+          error: updateError
+        } = await supabase.from('event_items').update({
+          quantity_sold: newQuantitySold
+        }).eq('id', cartItem.itemId);
         if (updateError) throw updateError;
-        
+
         // Record sale with order_id to group items in same transaction
-        const { error: saleError } = await supabase
-          .from('event_sales')
-          .insert({
-            event_item_id: cartItem.itemId,
-            quantity: cartItem.quantity,
-            unit_price: cartItem.price,
-            total_price: cartItem.price * cartItem.quantity,
-            order_id: orderId
-          });
-        
+        const {
+          error: saleError
+        } = await supabase.from('event_sales').insert({
+          event_item_id: cartItem.itemId,
+          quantity: cartItem.quantity,
+          unit_price: cartItem.price,
+          total_price: cartItem.price * cartItem.quantity,
+          order_id: orderId
+        });
         if (saleError) throw saleError;
-        
+
         // Update local state
-        setItems(prev => prev.map(i => 
-          i.id === cartItem.itemId 
-            ? { ...i, quantity_sold: newQuantitySold }
-            : i
-        ));
+        setItems(prev => prev.map(i => i.id === cartItem.itemId ? {
+          ...i,
+          quantity_sold: newQuantitySold
+        } : i));
       }
-      
       setOrderCount(prev => prev + 1);
-      
       toast({
         title: 'Sale Complete!',
         description: `${cartItemCount} items • $${cartTotal.toFixed(2)}`
       });
-      
       clearCart();
       setMobileCartOpen(false);
-      
     } catch (error: any) {
       toast({
         title: 'Checkout Failed',
@@ -281,27 +264,27 @@ export const EventRunner = ({
       setIsCheckingOut(false);
     }
   };
-  
+
   // Get cart quantity for an item
   const getCartQuantity = (itemId: string) => {
     return cart.find(c => c.itemId === itemId)?.quantity || 0;
   };
-  
+
   // Filtered and sorted items
   const filteredItems = useMemo(() => {
     let result = [...items];
-    
+
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(item => item.name.toLowerCase().includes(query));
     }
-    
+
     // Filter by category
     if (selectedCategory !== 'all') {
       result = result.filter(item => item.category === selectedCategory);
     }
-    
+
     // Sort items
     result.sort((a, b) => {
       switch (sortBy) {
@@ -314,15 +297,13 @@ export const EventRunner = ({
         case 'price-desc':
           return b.price - a.price;
         case 'remaining':
-          return (b.starting_quantity - b.quantity_sold) - (a.starting_quantity - a.quantity_sold);
+          return b.starting_quantity - b.quantity_sold - (a.starting_quantity - a.quantity_sold);
         default:
           return 0;
       }
     });
-    
     return result;
   }, [items, searchQuery, selectedCategory, sortBy]);
-
   useEffect(() => {
     loadItems();
     loadEventDetails();
@@ -330,71 +311,61 @@ export const EventRunner = ({
     loadCategories();
     loadOrderCount();
   }, [event.id]);
-  
+
   // Load order count from database (count distinct order_ids)
   const loadOrderCount = async () => {
     // Get all event_item_ids for this event first
-    const { data: eventItems } = await supabase
-      .from('event_items')
-      .select('id')
-      .eq('event_id', event.id);
-    
+    const {
+      data: eventItems
+    } = await supabase.from('event_items').select('id').eq('event_id', event.id);
     if (!eventItems || eventItems.length === 0) {
       setOrderCount(0);
       return;
     }
-    
     const itemIds = eventItems.map(item => item.id);
-    
+
     // Get distinct order_ids from sales for these items
-    const { data: sales } = await supabase
-      .from('event_sales')
-      .select('order_id')
-      .in('event_item_id', itemIds);
-    
+    const {
+      data: sales
+    } = await supabase.from('event_sales').select('order_id').in('event_item_id', itemIds);
     if (sales) {
       // Count distinct non-null order_ids
       const uniqueOrderIds = new Set(sales.map(s => s.order_id).filter(Boolean));
       setOrderCount(uniqueOrderIds.size);
     }
   };
-  
+
   // Load order history from database
   const loadOrderHistory = async () => {
     setLoadingHistory(true);
     try {
       // Get all event_item_ids for this event
-      const { data: eventItems } = await supabase
-        .from('event_items')
-        .select('id, name')
-        .eq('event_id', event.id);
-      
+      const {
+        data: eventItems
+      } = await supabase.from('event_items').select('id, name').eq('event_id', event.id);
       if (!eventItems || eventItems.length === 0) {
         setOrderHistory([]);
         return;
       }
-      
       const itemIds = eventItems.map(item => item.id);
       const itemNameMap = new Map(eventItems.map(item => [item.id, item.name]));
-      
+
       // Get all sales for these items
-      const { data: sales } = await supabase
-        .from('event_sales')
-        .select('order_id, event_item_id, quantity, unit_price, total_price, created_at')
-        .in('event_item_id', itemIds)
-        .order('created_at', { ascending: false });
-      
+      const {
+        data: sales
+      } = await supabase.from('event_sales').select('order_id, event_item_id, quantity, unit_price, total_price, created_at').in('event_item_id', itemIds).order('created_at', {
+        ascending: false
+      });
       if (!sales || sales.length === 0) {
         setOrderHistory([]);
         return;
       }
-      
+
       // Group sales by order_id
       const ordersMap = new Map<string, OrderHistoryItem>();
-      
       for (const sale of sales) {
         const orderId = sale.order_id || sale.created_at; // Fallback for legacy sales without order_id
-        
+
         if (!ordersMap.has(orderId)) {
           ordersMap.set(orderId, {
             order_id: orderId,
@@ -403,7 +374,6 @@ export const EventRunner = ({
             total: 0
           });
         }
-        
         const order = ordersMap.get(orderId)!;
         order.items.push({
           name: itemNameMap.get(sale.event_item_id) || 'Unknown Item',
@@ -413,11 +383,10 @@ export const EventRunner = ({
         });
         order.total += Number(sale.total_price);
       }
-      
+
       // Convert to array and sort by most recent
       const historyArray = Array.from(ordersMap.values());
       historyArray.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
       setOrderHistory(historyArray);
     } catch (error) {
       console.error('Failed to load order history:', error);
@@ -425,9 +394,10 @@ export const EventRunner = ({
       setLoadingHistory(false);
     }
   };
-  
   const loadCategories = async () => {
-    const { data } = await supabase.from('categories').select('name, icon');
+    const {
+      data
+    } = await supabase.from('categories').select('name, icon');
     if (data) {
       const iconMap: Record<string, string> = {};
       data.forEach(cat => {
@@ -439,7 +409,6 @@ export const EventRunner = ({
       setAllCategories(data);
     }
   };
-  
   const resetNewItemForm = () => {
     setNewItemName('');
     setNewItemPrice('');
@@ -448,7 +417,6 @@ export const EventRunner = ({
     setNewItemCategory('');
     setShowAddItem(false);
   };
-  
   const addNewItem = async () => {
     if (!newItemName.trim() || !newItemPrice || !newItemQuantity) {
       toast({
@@ -458,16 +426,17 @@ export const EventRunner = ({
       });
       return;
     }
-    
-    const { data, error } = await supabase.from('event_items').insert({
+    const {
+      data,
+      error
+    } = await supabase.from('event_items').insert({
       event_id: event.id,
       name: newItemName.trim(),
       price: parseFloat(newItemPrice) || 0,
       cogs: parseFloat(newItemCogs) || 0,
       starting_quantity: parseInt(newItemQuantity) || 0,
-      category: newItemCategory || null,
+      category: newItemCategory || null
     }).select().single();
-    
     if (error) {
       toast({
         title: 'Error',
@@ -476,7 +445,7 @@ export const EventRunner = ({
       });
       return;
     }
-    
+
     // Add to local state
     const newItem: EventItem = {
       id: data.id,
@@ -492,16 +461,17 @@ export const EventRunner = ({
       ...inventoryEdits,
       [data.id]: data.starting_quantity
     });
-    
     resetNewItemForm();
     toast({
       title: 'Item Added',
       description: `${newItemName} has been added to the inventory.`
     });
   };
-
   const loadEventDetails = async () => {
-    const { data, error } = await supabase.from('events').select('*').eq('id', event.id).maybeSingle();
+    const {
+      data,
+      error
+    } = await supabase.from('events').select('*').eq('id', event.id).maybeSingle();
     if (data) {
       setCurrentEvent(data as Event);
       // Show start confirmation if day isn't active
@@ -510,9 +480,11 @@ export const EventRunner = ({
       }
     }
   };
-
   const loadItems = async () => {
-    const { data, error } = await supabase.from('event_items').select('*').eq('event_id', event.id);
+    const {
+      data,
+      error
+    } = await supabase.from('event_items').select('*').eq('event_id', event.id);
     if (error) {
       toast({
         title: 'Error',
@@ -539,9 +511,11 @@ export const EventRunner = ({
     }
     setLoading(false);
   };
-
   const loadDaySummaries = async () => {
-    const { data, error } = await supabase.from('event_day_summaries').select('*').eq('event_id', event.id).order('day_number', {
+    const {
+      data,
+      error
+    } = await supabase.from('event_day_summaries').select('*').eq('event_id', event.id).order('day_number', {
       ascending: true
     });
     if (!error && data) {
@@ -555,11 +529,12 @@ export const EventRunner = ({
       })));
     }
   };
-
   const startDay = async () => {
     const newDay = (currentEvent.current_day || 0) + 1;
     const openTime = new Date().toISOString();
-    const { error } = await supabase.from('events').update({
+    const {
+      error
+    } = await supabase.from('events').update({
       status: 'active',
       current_day: newDay,
       day_open_time: openTime,
@@ -588,7 +563,6 @@ export const EventRunner = ({
       description: `Event opened at ${format(new Date(openTime), 'h:mm a')}`
     });
   };
-
   const endDay = async () => {
     const closeTime = new Date().toISOString();
 
@@ -605,7 +579,9 @@ export const EventRunner = ({
       revenue: dayRevenue,
       items_sold: dayItemsSold
     });
-    const { error } = await supabase.from('events').update({
+    const {
+      error
+    } = await supabase.from('events').update({
       day_close_time: closeTime
     }).eq('id', event.id);
     if (error) {
@@ -629,7 +605,6 @@ export const EventRunner = ({
       description: `Event closed at ${format(new Date(closeTime), 'h:mm a')}`
     });
   };
-
   const saveInventoryEdits = async () => {
     const updates = Object.entries(inventoryEdits).map(([id, quantity]) => ({
       id,
@@ -647,7 +622,6 @@ export const EventRunner = ({
       description: 'Starting quantities have been updated for the next day.'
     });
   };
-
   const completeEvent = async () => {
     const closeTime = new Date().toISOString();
 
@@ -685,7 +659,6 @@ export const EventRunner = ({
   // Calculate totals from all day summaries
   const allDaysRevenue = daySummaries.reduce((sum, d) => sum + d.revenue, 0);
   const allDaysItemsSold = daySummaries.reduce((sum, d) => sum + d.items_sold, 0);
-
   if (loading) {
     return <div className="flex items-center justify-center py-12">
         <p className="text-muted-foreground">Loading...</p>
@@ -693,8 +666,11 @@ export const EventRunner = ({
   }
 
   // Cart Sidebar Component
-  const CartSidebar = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className={`flex flex-col h-full ${isMobile ? '' : 'bg-card border-l'}`}>
+  const CartSidebar = ({
+    isMobile = false
+  }: {
+    isMobile?: boolean;
+  }) => <div className={`flex flex-col h-full ${isMobile ? '' : 'bg-card border-l'}`}>
       {/* Cart Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
@@ -702,37 +678,33 @@ export const EventRunner = ({
             <ShoppingCart className="w-5 h-5" />
             Current Order
           </h3>
-          {cart.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:text-destructive">
+          {cart.length > 0 && <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:text-destructive">
               <Trash2 className="w-4 h-4 mr-1" />
               Clear
-            </Button>
-          )}
+            </Button>}
         </div>
       </div>
       
       {/* Cart Items */}
       <ScrollArea className="flex-1 p-4">
-        {cart.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
+        {cart.length === 0 ? <div className="text-center py-12 text-muted-foreground">
             <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className="font-medium">Cart is empty</p>
             <p className="text-sm">Tap items to add them</p>
-          </div>
-        ) : (
-          <div className="space-y-3 w-full">
+          </div> : <div className="space-y-3 w-full">
             <AnimatePresence mode="popLayout">
-              {cart.map((cartItem) => {
-                const CategoryIcon = getCategoryIcon(cartItem.category);
-                return (
-                  <motion.div
-                    key={cartItem.itemId}
-                    layout
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: 50 }}
-                    className="bg-secondary/50 rounded-lg p-3 w-full"
-                  >
+              {cart.map(cartItem => {
+            const CategoryIcon = getCategoryIcon(cartItem.category);
+            return <motion.div key={cartItem.itemId} layout initial={{
+              opacity: 0,
+              y: -10
+            }} animate={{
+              opacity: 1,
+              y: 0
+            }} exit={{
+              opacity: 0,
+              x: 50
+            }} className="bg-secondary/50 rounded-lg p-3 w-full">
                     <div className="flex items-start gap-2 w-full">
                       <div className="w-8 h-8 rounded-lg bg-pink-soft/10 flex items-center justify-center flex-shrink-0">
                         <CategoryIcon className="w-4 h-4 text-pink-soft" />
@@ -741,43 +713,26 @@ export const EventRunner = ({
                         <p className="font-medium text-sm truncate">{cartItem.name}</p>
                         <p className="text-xs text-muted-foreground">${cartItem.price.toFixed(2)} ea</p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFromCart(cartItem.itemId)}
-                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive flex-shrink-0"
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => removeFromCart(cartItem.itemId)} className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive flex-shrink-0">
                         <X className="w-3 h-3" />
                       </Button>
                     </div>
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => updateCartQuantity(cartItem.itemId, cartItem.quantity - 1)}
-                          className="h-7 w-7 p-0"
-                        >
+                        <Button variant="outline" size="sm" onClick={() => updateCartQuantity(cartItem.itemId, cartItem.quantity - 1)} className="h-7 w-7 p-0">
                           <Minus className="w-3 h-3" />
                         </Button>
                         <span className="w-6 text-center font-medium text-sm">{cartItem.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => updateCartQuantity(cartItem.itemId, cartItem.quantity + 1)}
-                          className="h-7 w-7 p-0"
-                        >
+                        <Button variant="outline" size="sm" onClick={() => updateCartQuantity(cartItem.itemId, cartItem.quantity + 1)} className="h-7 w-7 p-0">
                           <Plus className="w-3 h-3" />
                         </Button>
                       </div>
                       <span className="font-semibold text-sm">${(cartItem.price * cartItem.quantity).toFixed(2)}</span>
                     </div>
-                  </motion.div>
-                );
-              })}
+                  </motion.div>;
+          })}
             </AnimatePresence>
-          </div>
-        )}
+          </div>}
       </ScrollArea>
       
       {/* Cart Footer */}
@@ -786,23 +741,14 @@ export const EventRunner = ({
           <span>Total</span>
           <span className="text-primary">${cartTotal.toFixed(2)}</span>
         </div>
-        <Button 
-          onClick={checkout}
-          disabled={cart.length === 0 || isCheckingOut}
-          className="w-full bg-pink-soft hover:bg-pink-medium text-white py-6 text-lg"
-        >
-          {isCheckingOut ? (
-            'Processing...'
-          ) : (
-            <>
+        <Button onClick={checkout} disabled={cart.length === 0 || isCheckingOut} className="w-full bg-pink-soft hover:bg-pink-medium text-white py-6 text-lg">
+          {isCheckingOut ? 'Processing...' : <>
               <CheckCircle className="w-5 h-5 mr-2" />
               Checkout ({cartItemCount} items)
-            </>
-          )}
+            </>}
         </Button>
       </div>
-    </div>
-  );
+    </div>;
 
   // Start Confirmation Screen (with inventory editing for multi-day events)
   if (showStartConfirm) {
@@ -885,37 +831,31 @@ export const EventRunner = ({
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-sm">Adjust Inventory for Day {dayNumber}</h3>
                   <div className="flex gap-2">
-                    {!editingInventory ? (
-                      <Button variant="outline" size="sm" onClick={() => setEditingInventory(true)}>
+                    {!editingInventory ? <Button variant="outline" size="sm" onClick={() => setEditingInventory(true)}>
                         <Edit2 className="w-4 h-4 mr-1" />
                         Edit Quantities
-                      </Button>
-                    ) : (
-                      <>
+                      </Button> : <>
                         <Button variant="outline" size="sm" onClick={() => {
-                          setEditingInventory(false);
-                          setShowAddItem(false);
-                          const edits: Record<string, number> = {};
-                          items.forEach(item => {
-                            edits[item.id] = item.starting_quantity;
-                          });
-                          setInventoryEdits(edits);
-                        }}>
+                    setEditingInventory(false);
+                    setShowAddItem(false);
+                    const edits: Record<string, number> = {};
+                    items.forEach(item => {
+                      edits[item.id] = item.starting_quantity;
+                    });
+                    setInventoryEdits(edits);
+                  }}>
                           Cancel
                         </Button>
                         <Button size="sm" onClick={saveInventoryEdits} className="bg-pink-soft hover:bg-pink-medium">
                           Save Changes
                         </Button>
-                      </>
-                    )}
+                      </>}
                   </div>
                 </div>
                 
-                {editingInventory ? (
-                  <div className="space-y-3">
+                {editingInventory ? <div className="space-y-3">
                     <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {items.map(item => (
-                        <div key={item.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center">
+                      {items.map(item => <div key={item.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center">
                           <div>
                             <span className="font-medium">{item.name}</span>
                             <span className="text-muted-foreground text-sm ml-2">
@@ -924,89 +864,41 @@ export const EventRunner = ({
                           </div>
                           <div className="flex items-center gap-2">
                             <Label className="text-sm text-muted-foreground">Qty:</Label>
-                            <Input 
-                              type="number" 
-                              min="0" 
-                              value={inventoryEdits[item.id] || 0} 
-                              onChange={e => setInventoryEdits({
-                                ...inventoryEdits,
-                                [item.id]: parseInt(e.target.value) || 0
-                              })} 
-                              className="w-20 h-8" 
-                            />
+                            <Input type="number" min="0" value={inventoryEdits[item.id] || 0} onChange={e => setInventoryEdits({
+                      ...inventoryEdits,
+                      [item.id]: parseInt(e.target.value) || 0
+                    })} className="w-20 h-8" />
                           </div>
-                        </div>
-                      ))}
+                        </div>)}
                     </div>
                     
                     {/* Add New Item Section */}
-                    {!showAddItem ? (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setShowAddItem(true)}
-                        className="w-full border-dashed"
-                      >
+                    {!showAddItem ? <Button variant="outline" size="sm" onClick={() => setShowAddItem(true)} className="w-full border-dashed">
                         <Plus className="w-4 h-4 mr-1" />
                         Add New Item
-                      </Button>
-                    ) : (
-                      <div className="bg-secondary/50 rounded-lg p-4 space-y-3">
+                      </Button> : <div className="bg-secondary/50 rounded-lg p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">New Item</span>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={resetNewItemForm}
-                            className="h-7 w-7 p-0"
-                          >
+                          <Button variant="ghost" size="sm" onClick={resetNewItemForm} className="h-7 w-7 p-0">
                             <X className="w-4 h-4" />
                           </Button>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div className="col-span-2">
                             <Label className="text-xs text-muted-foreground">Name *</Label>
-                            <Input 
-                              placeholder="Item name" 
-                              value={newItemName}
-                              onChange={e => setNewItemName(e.target.value)}
-                              className="h-8"
-                            />
+                            <Input placeholder="Item name" value={newItemName} onChange={e => setNewItemName(e.target.value)} className="h-8" />
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">Price *</Label>
-                            <Input 
-                              type="number" 
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00" 
-                              value={newItemPrice}
-                              onChange={e => setNewItemPrice(e.target.value)}
-                              className="h-8"
-                            />
+                            <Input type="number" step="0.01" min="0" placeholder="0.00" value={newItemPrice} onChange={e => setNewItemPrice(e.target.value)} className="h-8" />
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">COGS</Label>
-                            <Input 
-                              type="number" 
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00" 
-                              value={newItemCogs}
-                              onChange={e => setNewItemCogs(e.target.value)}
-                              className="h-8"
-                            />
+                            <Input type="number" step="0.01" min="0" placeholder="0.00" value={newItemCogs} onChange={e => setNewItemCogs(e.target.value)} className="h-8" />
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">Quantity *</Label>
-                            <Input 
-                              type="number" 
-                              min="0"
-                              placeholder="0" 
-                              value={newItemQuantity}
-                              onChange={e => setNewItemQuantity(e.target.value)}
-                              className="h-8"
-                            />
+                            <Input type="number" min="0" placeholder="0" value={newItemQuantity} onChange={e => setNewItemQuantity(e.target.value)} className="h-8" />
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">Category</Label>
@@ -1015,31 +907,21 @@ export const EventRunner = ({
                                 <SelectValue placeholder="Select" />
                               </SelectTrigger>
                               <SelectContent>
-                                {allCategories.map(cat => (
-                                  <SelectItem key={cat.name} value={cat.name}>
+                                {allCategories.map(cat => <SelectItem key={cat.name} value={cat.name}>
                                     {cat.name}
-                                  </SelectItem>
-                                ))}
+                                  </SelectItem>)}
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
-                        <Button 
-                          size="sm" 
-                          onClick={addNewItem}
-                          className="w-full bg-pink-soft hover:bg-pink-medium"
-                        >
+                        <Button size="sm" onClick={addNewItem} className="w-full bg-pink-soft hover:bg-pink-medium">
                           <Plus className="w-4 h-4 mr-1" />
                           Add Item
                         </Button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
+                      </div>}
+                  </div> : <p className="text-sm text-muted-foreground">
                     Restock or adjust quantities before starting the next day.
-                  </p>
-                )}
+                  </p>}
               </div>}
 
             <div className="space-y-3 pt-2">
@@ -1055,7 +937,6 @@ export const EventRunner = ({
         </div>
       </div>;
   }
-
   return <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -1093,12 +974,12 @@ export const EventRunner = ({
       </div>
 
       {/* Tabs for Sales and Day Summary */}
-      <Tabs value={activeTab} onValueChange={(tab) => {
-        setActiveTab(tab);
-        if (tab === 'history') {
-          loadOrderHistory();
-        }
-      }}>
+      <Tabs value={activeTab} onValueChange={tab => {
+      setActiveTab(tab);
+      if (tab === 'history') {
+        loadOrderHistory();
+      }
+    }}>
         <TabsList>
           <TabsTrigger value="sales">
             <Package className="w-4 h-4 mr-2" />
@@ -1163,22 +1044,10 @@ export const EventRunner = ({
                 {/* Search */}
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search items..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 pr-9"
-                  />
-                  {searchQuery && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                      onClick={() => setSearchQuery('')}
-                    >
+                  <Input placeholder="Search items..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 pr-9" />
+                  {searchQuery && <Button variant="ghost" size="sm" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0" onClick={() => setSearchQuery('')}>
                       <X className="w-4 h-4" />
-                    </Button>
-                  )}
+                    </Button>}
                 </div>
                 
                 {/* Category Filter */}
@@ -1190,16 +1059,14 @@ export const EventRunner = ({
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
                     {categories.map(cat => {
-                      const IconComponent = getCategoryIcon(cat);
-                      return (
-                        <SelectItem key={cat} value={cat}>
+                    const IconComponent = getCategoryIcon(cat);
+                    return <SelectItem key={cat} value={cat}>
                           <div className="flex items-center gap-2">
                             <IconComponent className="w-4 h-4" />
                             <span className="capitalize">{cat}</span>
                           </div>
-                        </SelectItem>
-                      );
-                    })}
+                        </SelectItem>;
+                  })}
                   </SelectContent>
                 </Select>
               </div>
@@ -1207,31 +1074,20 @@ export const EventRunner = ({
               {/* POS Item Tiles Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {filteredItems.map(item => {
-                  const remaining = item.starting_quantity - item.quantity_sold;
-                  const cartQty = getCartQuantity(item.id);
-                  const isOutOfStock = remaining <= 0;
-                  const CategoryIcon = getCategoryIcon(item.category);
-                  
-                  return (
-                    <motion.button
-                      key={item.id}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => !isOutOfStock && addToCart(item)}
-                      disabled={isOutOfStock}
-                      className={`relative aspect-square p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center
-                        ${isOutOfStock 
-                          ? 'bg-muted/50 border-muted cursor-not-allowed opacity-60' 
-                          : 'bg-card border-border hover:border-pink-soft hover:shadow-lg cursor-pointer active:bg-pink-soft/10'
-                        }
+                const remaining = item.starting_quantity - item.quantity_sold;
+                const cartQty = getCartQuantity(item.id);
+                const isOutOfStock = remaining <= 0;
+                const CategoryIcon = getCategoryIcon(item.category);
+                return <motion.button key={item.id} whileTap={{
+                  scale: 0.95
+                }} onClick={() => !isOutOfStock && addToCart(item)} disabled={isOutOfStock} className={`relative aspect-square p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center
+                        ${isOutOfStock ? 'bg-muted/50 border-muted cursor-not-allowed opacity-60' : 'bg-card border-border hover:border-pink-soft hover:shadow-lg cursor-pointer active:bg-pink-soft/10'}
                         ${cartQty > 0 ? 'border-pink-soft bg-pink-soft/5' : ''}
-                      `}
-                    >
+                      `}>
                       {/* Cart Badge */}
-                      {cartQty > 0 && (
-                        <Badge className="absolute -top-2 -right-2 bg-pink-soft hover:bg-pink-soft text-white h-6 w-6 p-0 flex items-center justify-center rounded-full text-xs font-bold">
+                      {cartQty > 0 && <Badge className="absolute -top-2 -right-2 bg-pink-soft hover:bg-pink-soft text-white h-6 w-6 p-0 flex items-center justify-center rounded-full text-xs font-bold">
                           {cartQty}
-                        </Badge>
-                      )}
+                        </Badge>}
                       
                       {/* Category Icon */}
                       <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${isOutOfStock ? 'bg-muted' : 'bg-pink-soft/10'}`}>
@@ -1248,25 +1104,23 @@ export const EventRunner = ({
                       <span className={`text-xs ${isOutOfStock ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
                         {isOutOfStock ? 'Out of stock' : `${remaining} left`}
                       </span>
-                    </motion.button>
-                  );
-                })}
+                    </motion.button>;
+              })}
               </div>
 
-              {filteredItems.length === 0 && items.length > 0 && (
-                <div className="text-center py-12 text-muted-foreground">
+              {filteredItems.length === 0 && items.length > 0 && <div className="text-center py-12 text-muted-foreground">
                   <p>No items match your search or filter.</p>
-                  <Button variant="link" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); }}>
+                  <Button variant="link" onClick={() => {
+                setSearchQuery('');
+                setSelectedCategory('all');
+              }}>
                     Clear filters
                   </Button>
-                </div>
-              )}
+                </div>}
 
-              {items.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
+              {items.length === 0 && <div className="text-center py-12 text-muted-foreground">
                   <p>No items in this event. Go back and add some inventory first.</p>
-                </div>
-              )}
+                </div>}
             </div>
 
             {/* Right Side - Cart Sidebar (Desktop) */}
@@ -1281,16 +1135,11 @@ export const EventRunner = ({
           <div className="lg:hidden fixed bottom-6 right-6 z-50">
             <Sheet open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
               <SheetTrigger asChild>
-                <Button 
-                  size="lg" 
-                  className="h-16 w-16 rounded-full bg-pink-soft hover:bg-pink-medium shadow-lg relative"
-                >
+                <Button size="lg" className="h-16 w-16 rounded-full bg-pink-soft hover:bg-pink-medium shadow-lg relative">
                   <ShoppingCart className="w-6 h-6" />
-                  {cartItemCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 bg-primary hover:bg-primary text-primary-foreground h-6 min-w-6 p-0 flex items-center justify-center rounded-full text-xs font-bold">
+                  {cartItemCount > 0 && <Badge className="absolute -top-1 -right-1 bg-primary hover:bg-primary text-primary-foreground h-6 min-w-6 p-0 flex items-center justify-center rounded-full text-xs font-bold">
                       {cartItemCount}
-                    </Badge>
-                  )}
+                    </Badge>}
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-full sm:w-96 p-0">
@@ -1311,27 +1160,23 @@ export const EventRunner = ({
               <span className="text-sm text-muted-foreground">{orderHistory.length} orders</span>
             </div>
             
-            {loadingHistory ? (
-              <div className="text-center py-12 text-muted-foreground">
+            {loadingHistory ? <div className="text-center py-12 text-muted-foreground">
                 <p>Loading order history...</p>
-              </div>
-            ) : orderHistory.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
+              </div> : orderHistory.length === 0 ? <div className="text-center py-12 text-muted-foreground">
                 <History className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p className="font-medium">No orders yet</p>
                 <p className="text-sm">Orders will appear here after checkout</p>
-              </div>
-            ) : (
-              <ScrollArea className="h-[calc(100vh-20rem)]">
+              </div> : <ScrollArea className="h-[calc(100vh-20rem)]">
                 <div className="space-y-3 pr-4">
-                  {orderHistory.map((order, index) => (
-                    <motion.div
-                      key={order.order_id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.03 }}
-                      className="bg-secondary/50 rounded-lg p-4"
-                    >
+                  {orderHistory.map((order, index) => <motion.div key={order.order_id} initial={{
+                opacity: 0,
+                y: 10
+              }} animate={{
+                opacity: 1,
+                y: 0
+              }} transition={{
+                delay: index * 0.03
+              }} className="bg-secondary/50 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-xs">
@@ -1341,24 +1186,20 @@ export const EventRunner = ({
                             {format(new Date(order.created_at), 'h:mm a')}
                           </span>
                         </div>
-                        <span className="font-bold text-primary">${order.total.toFixed(2)}</span>
+                        <span className="font-bold text-lime-500">${order.total.toFixed(2)}</span>
                       </div>
                       <div className="space-y-1.5">
-                        {order.items.map((item, itemIndex) => (
-                          <div key={itemIndex} className="flex items-center justify-between text-sm">
+                        {order.items.map((item, itemIndex) => <div key={itemIndex} className="flex items-center justify-between text-sm">
                             <div className="flex items-center gap-2">
                               <span className="text-muted-foreground">{item.quantity}×</span>
                               <span className="truncate">{item.name}</span>
                             </div>
                             <span className="text-muted-foreground">${item.total_price.toFixed(2)}</span>
-                          </div>
-                        ))}
+                          </div>)}
                       </div>
-                    </motion.div>
-                  ))}
+                    </motion.div>)}
                 </div>
-              </ScrollArea>
-            )}
+              </ScrollArea>}
           </div>
         </TabsContent>
 
@@ -1397,35 +1238,43 @@ export const EventRunner = ({
           </div>
 
           {/* Revenue Chart - Line Graph */}
-          {(daySummaries.length > 0 || currentDay > 0) && (
-            <div className="bg-card rounded-xl border p-4">
+          {(daySummaries.length > 0 || currentDay > 0) && <div className="bg-card rounded-xl border p-4">
               <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-green-600" />
                 Revenue by Day
               </h4>
               <div className="relative h-32">
                 {(() => {
-                  const allDays = [
-                    ...daySummaries.map(d => ({ day: d.day_number, revenue: d.revenue, items: d.items_sold, current: false })),
-                    ...(currentDay > 0 ? [{ day: currentDay, revenue: totalRevenue, items: totalItemsSold, current: true }] : [])
-                  ].sort((a, b) => a.day - b.day);
-                  const maxRevenue = Math.max(...allDays.map(d => d.revenue), 1);
-                  const minRevenue = Math.min(...allDays.map(d => d.revenue));
-                  const range = maxRevenue - minRevenue || 1;
-                  
-                  // Calculate points for the line
-                  const points = allDays.map((d, i) => {
-                    const x = allDays.length === 1 ? 50 : (i / (allDays.length - 1)) * 100;
-                    const y = 100 - ((d.revenue - minRevenue) / range) * 80 - 10;
-                    return { x, y, ...d };
-                  });
-                  
-                  // Create SVG path
-                  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-                  const areaPath = `${linePath} L ${points[points.length - 1].x} 95 L ${points[0].x} 95 Z`;
-                  
-                  return (
-                    <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+              const allDays = [...daySummaries.map(d => ({
+                day: d.day_number,
+                revenue: d.revenue,
+                items: d.items_sold,
+                current: false
+              })), ...(currentDay > 0 ? [{
+                day: currentDay,
+                revenue: totalRevenue,
+                items: totalItemsSold,
+                current: true
+              }] : [])].sort((a, b) => a.day - b.day);
+              const maxRevenue = Math.max(...allDays.map(d => d.revenue), 1);
+              const minRevenue = Math.min(...allDays.map(d => d.revenue));
+              const range = maxRevenue - minRevenue || 1;
+
+              // Calculate points for the line
+              const points = allDays.map((d, i) => {
+                const x = allDays.length === 1 ? 50 : i / (allDays.length - 1) * 100;
+                const y = 100 - (d.revenue - minRevenue) / range * 80 - 10;
+                return {
+                  x,
+                  y,
+                  ...d
+                };
+              });
+
+              // Create SVG path
+              const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+              const areaPath = `${linePath} L ${points[points.length - 1].x} 95 L ${points[0].x} 95 Z`;
+              return <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                       {/* Grid lines */}
                       <line x1="0" y1="25" x2="100" y2="25" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.3" />
                       <line x1="0" y1="50" x2="100" y2="50" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.3" />
@@ -1438,17 +1287,7 @@ export const EventRunner = ({
                       <path d={linePath} fill="none" stroke="#22c55e" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" />
                       
                       {/* Points */}
-                      {points.map((p, i) => (
-                        <circle 
-                          key={i} 
-                          cx={p.x} 
-                          cy={p.y} 
-                          r="1.5" 
-                          fill={p.current ? '#22c55e' : '#4ade80'}
-                          stroke="white"
-                          strokeWidth="0.5"
-                        />
-                      ))}
+                      {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="1.5" fill={p.current ? '#22c55e' : '#4ade80'} stroke="white" strokeWidth="0.5" />)}
                       
                       {/* Gradient definition */}
                       <defs>
@@ -1457,33 +1296,35 @@ export const EventRunner = ({
                           <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
                         </linearGradient>
                       </defs>
-                    </svg>
-                  );
-                })()}
+                    </svg>;
+            })()}
                 
                 {/* Labels */}
                 <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1">
                   {(() => {
-                    const allDays = [
-                      ...daySummaries.map(d => ({ day: d.day_number, revenue: d.revenue, items: d.items_sold, current: false })),
-                      ...(currentDay > 0 ? [{ day: currentDay, revenue: totalRevenue, items: totalItemsSold, current: true }] : [])
-                    ].sort((a, b) => a.day - b.day);
-                    
-                    return allDays.map((d, i) => (
-                      <div key={i} className="text-center group relative">
+                const allDays = [...daySummaries.map(d => ({
+                  day: d.day_number,
+                  revenue: d.revenue,
+                  items: d.items_sold,
+                  current: false
+                })), ...(currentDay > 0 ? [{
+                  day: currentDay,
+                  revenue: totalRevenue,
+                  items: totalItemsSold,
+                  current: true
+                }] : [])].sort((a, b) => a.day - b.day);
+                return allDays.map((d, i) => <div key={i} className="text-center group relative">
                         <span className={`text-[10px] ${d.current ? 'text-green-600 font-medium' : 'text-muted-foreground'}`}>D{d.day}</span>
                         {/* Tooltip */}
                         <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-popover border rounded-md px-2 py-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-md">
                           <p className="font-medium text-green-600">${d.revenue.toFixed(2)}</p>
                           <p className="text-muted-foreground">{d.items} items</p>
                         </div>
-                      </div>
-                    ));
-                  })()}
+                      </div>);
+              })()}
                 </div>
               </div>
-            </div>
-          )}
+            </div>}
 
           {/* Daily Breakdown - Compact Cards */}
           <div className="space-y-2">
@@ -1507,23 +1348,18 @@ export const EventRunner = ({
               </div>
               <div className="w-16">
                 <div className="w-full bg-secondary rounded-full h-1.5">
-                  <div 
-                    className="bg-green-500 h-1.5 rounded-full transition-all" 
-                    style={{ width: `${Math.min((totalRevenue / Math.max(allDaysRevenue + totalRevenue, 1)) * 100, 100)}%` }} 
-                  />
+                  <div className="bg-green-500 h-1.5 rounded-full transition-all" style={{
+                  width: `${Math.min(totalRevenue / Math.max(allDaysRevenue + totalRevenue, 1) * 100, 100)}%`
+                }} />
                 </div>
               </div>
             </div>
 
             {/* Previous Days - Compact */}
             {daySummaries.slice().reverse().map(day => {
-              const dayDuration = day.close_time 
-                ? Math.round((new Date(day.close_time).getTime() - new Date(day.open_time).getTime()) / (1000 * 60 * 60))
-                : 0;
-              const revenuePercent = Math.min((day.revenue / Math.max(allDaysRevenue + totalRevenue, 1)) * 100, 100);
-              
-              return (
-                <div key={day.id} className="bg-card rounded-lg border p-3 flex items-center gap-3">
+            const dayDuration = day.close_time ? Math.round((new Date(day.close_time).getTime() - new Date(day.open_time).getTime()) / (1000 * 60 * 60)) : 0;
+            const revenuePercent = Math.min(day.revenue / Math.max(allDaysRevenue + totalRevenue, 1) * 100, 100);
+            return <div key={day.id} className="bg-card rounded-lg border p-3 flex items-center gap-3">
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
                     <span className="text-xs font-bold text-muted-foreground">{day.day_number}</span>
                   </div>
@@ -1540,52 +1376,31 @@ export const EventRunner = ({
                   </div>
                   <div className="w-16">
                     <div className="w-full bg-secondary rounded-full h-1.5">
-                      <div 
-                        className="bg-primary/60 h-1.5 rounded-full transition-all" 
-                        style={{ width: `${revenuePercent}%` }} 
-                      />
+                      <div className="bg-primary/60 h-1.5 rounded-full transition-all" style={{
+                    width: `${revenuePercent}%`
+                  }} />
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                </div>;
+          })}
           </div>
 
           {/* Top Sellers - Horizontal Bar Chart */}
-          {items.length > 0 && (
-            <div className="bg-card rounded-xl border p-4">
+          {items.length > 0 && <div className="bg-card rounded-xl border p-4">
               <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
                 <Package className="w-4 h-4 text-primary" />
                 Top Sellers
               </h4>
-              {items.filter(item => item.quantity_sold > 0).length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No sales yet</p>
-              ) : (
-                <div className="space-y-3">
-                  {items
-                    .filter(item => item.quantity_sold > 0)
-                    .sort((a, b) => b.quantity_sold - a.quantity_sold)
-                    .slice(0, 8)
-                    .map((item, index) => {
-                      const maxSold = Math.max(...items.map(i => i.quantity_sold), 1);
-                      const percent = (item.quantity_sold / maxSold) * 100;
-                      const CategoryIcon = getCategoryIcon(item.category);
-                      
-                      // Color gradient from most to least popular
-                      const colors = [
-                        'bg-pink-soft',
-                        'bg-pink-soft/90',
-                        'bg-pink-soft/80',
-                        'bg-pink-soft/70',
-                        'bg-pink-soft/60',
-                        'bg-pink-soft/50',
-                        'bg-pink-soft/40',
-                        'bg-pink-soft/30',
-                      ];
-                      const barColor = colors[index] || colors[colors.length - 1];
-                      
-                      return (
-                        <div key={item.id} className="group">
+              {items.filter(item => item.quantity_sold > 0).length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No sales yet</p> : <div className="space-y-3">
+                  {items.filter(item => item.quantity_sold > 0).sort((a, b) => b.quantity_sold - a.quantity_sold).slice(0, 8).map((item, index) => {
+              const maxSold = Math.max(...items.map(i => i.quantity_sold), 1);
+              const percent = item.quantity_sold / maxSold * 100;
+              const CategoryIcon = getCategoryIcon(item.category);
+
+              // Color gradient from most to least popular
+              const colors = ['bg-pink-soft', 'bg-pink-soft/90', 'bg-pink-soft/80', 'bg-pink-soft/70', 'bg-pink-soft/60', 'bg-pink-soft/50', 'bg-pink-soft/40', 'bg-pink-soft/30'];
+              const barColor = colors[index] || colors[colors.length - 1];
+              return <div key={item.id} className="group">
                           <div className="flex items-center gap-3 mb-1">
                             <div className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
                               <CategoryIcon className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1596,27 +1411,25 @@ export const EventRunner = ({
                           <div className="flex items-center gap-3">
                             <div className="w-6 flex-shrink-0" /> {/* Spacer for alignment */}
                             <div className="flex-1 bg-secondary/50 rounded-full h-4 overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${percent}%` }}
-                                transition={{ duration: 0.5, delay: index * 0.05, ease: "easeOut" }}
-                                className={`${barColor} h-full rounded-full flex items-center justify-end pr-2`}
-                              >
-                                {percent > 25 && (
-                                  <span className="text-[10px] font-medium text-white/90">
+                              <motion.div initial={{
+                      width: 0
+                    }} animate={{
+                      width: `${percent}%`
+                    }} transition={{
+                      duration: 0.5,
+                      delay: index * 0.05,
+                      ease: "easeOut"
+                    }} className={`${barColor} h-full rounded-full flex items-center justify-end pr-2`}>
+                                {percent > 25 && <span className="text-[10px] font-medium text-white/90">
                                     ${(item.price * item.quantity_sold).toFixed(0)}
-                                  </span>
-                                )}
+                                  </span>}
                               </motion.div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
-            </div>
-          )}
+                        </div>;
+            })}
+                </div>}
+            </div>}
         </TabsContent>
       </Tabs>
 
@@ -1640,14 +1453,14 @@ export const EventRunner = ({
               Cancel
             </Button>
             <Button onClick={() => {
-              if (manualSaleItem) {
-                for (let i = 0; i < manualQuantity; i++) {
-                  addToCart(manualSaleItem);
-                }
+            if (manualSaleItem) {
+              for (let i = 0; i < manualQuantity; i++) {
+                addToCart(manualSaleItem);
               }
-              setManualSaleItem(null);
-              setManualQuantity(1);
-            }} className="bg-pink-soft hover:bg-pink-medium">
+            }
+            setManualSaleItem(null);
+            setManualQuantity(1);
+          }} className="bg-pink-soft hover:bg-pink-medium">
               Add to Cart
             </Button>
           </DialogFooter>
