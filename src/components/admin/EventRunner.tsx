@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3, Search, Filter, X, ShoppingCart, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3, Search, Filter, X, ShoppingCart, Trash2, History, Receipt } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -102,6 +102,16 @@ export const EventRunner = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
+  
+  // Order history state
+  interface OrderHistoryItem {
+    order_id: string;
+    created_at: string;
+    items: { name: string; quantity: number; unit_price: number; total_price: number }[];
+    total: number;
+  }
+  const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Determine if we need to show the start confirmation
   const isDayActive = currentEvent.day_open_time && !currentEvent.day_close_time;
@@ -346,6 +356,73 @@ export const EventRunner = ({
       // Count distinct non-null order_ids
       const uniqueOrderIds = new Set(sales.map(s => s.order_id).filter(Boolean));
       setOrderCount(uniqueOrderIds.size);
+    }
+  };
+  
+  // Load order history from database
+  const loadOrderHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      // Get all event_item_ids for this event
+      const { data: eventItems } = await supabase
+        .from('event_items')
+        .select('id, name')
+        .eq('event_id', event.id);
+      
+      if (!eventItems || eventItems.length === 0) {
+        setOrderHistory([]);
+        return;
+      }
+      
+      const itemIds = eventItems.map(item => item.id);
+      const itemNameMap = new Map(eventItems.map(item => [item.id, item.name]));
+      
+      // Get all sales for these items
+      const { data: sales } = await supabase
+        .from('event_sales')
+        .select('order_id, event_item_id, quantity, unit_price, total_price, created_at')
+        .in('event_item_id', itemIds)
+        .order('created_at', { ascending: false });
+      
+      if (!sales || sales.length === 0) {
+        setOrderHistory([]);
+        return;
+      }
+      
+      // Group sales by order_id
+      const ordersMap = new Map<string, OrderHistoryItem>();
+      
+      for (const sale of sales) {
+        const orderId = sale.order_id || sale.created_at; // Fallback for legacy sales without order_id
+        
+        if (!ordersMap.has(orderId)) {
+          ordersMap.set(orderId, {
+            order_id: orderId,
+            created_at: sale.created_at,
+            items: [],
+            total: 0
+          });
+        }
+        
+        const order = ordersMap.get(orderId)!;
+        order.items.push({
+          name: itemNameMap.get(sale.event_item_id) || 'Unknown Item',
+          quantity: sale.quantity,
+          unit_price: Number(sale.unit_price),
+          total_price: Number(sale.total_price)
+        });
+        order.total += Number(sale.total_price);
+      }
+      
+      // Convert to array and sort by most recent
+      const historyArray = Array.from(ordersMap.values());
+      historyArray.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setOrderHistory(historyArray);
+    } catch (error) {
+      console.error('Failed to load order history:', error);
+    } finally {
+      setLoadingHistory(false);
     }
   };
   
@@ -1016,11 +1093,20 @@ export const EventRunner = ({
       </div>
 
       {/* Tabs for Sales and Day Summary */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={(tab) => {
+        setActiveTab(tab);
+        if (tab === 'history') {
+          loadOrderHistory();
+        }
+      }}>
         <TabsList>
           <TabsTrigger value="sales">
             <Package className="w-4 h-4 mr-2" />
             POS
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            <History className="w-4 h-4 mr-2" />
+            Order History
           </TabsTrigger>
           <TabsTrigger value="summary">
             <BarChart3 className="w-4 h-4 mr-2" />
@@ -1211,6 +1297,68 @@ export const EventRunner = ({
                 <CartSidebar isMobile />
               </SheetContent>
             </Sheet>
+          </div>
+        </TabsContent>
+
+        {/* Order History Tab */}
+        <TabsContent value="history" className="space-y-4 mt-4">
+          <div className="bg-card rounded-xl border p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-primary" />
+                Order History
+              </h3>
+              <span className="text-sm text-muted-foreground">{orderHistory.length} orders</span>
+            </div>
+            
+            {loadingHistory ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>Loading order history...</p>
+              </div>
+            ) : orderHistory.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <History className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="font-medium">No orders yet</p>
+                <p className="text-sm">Orders will appear here after checkout</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[calc(100vh-20rem)]">
+                <div className="space-y-3 pr-4">
+                  {orderHistory.map((order, index) => (
+                    <motion.div
+                      key={order.order_id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className="bg-secondary/50 rounded-lg p-4"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            Order #{orderHistory.length - index}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(order.created_at), 'h:mm a')}
+                          </span>
+                        </div>
+                        <span className="font-bold text-primary">${order.total.toFixed(2)}</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {order.items.map((item, itemIndex) => (
+                          <div key={itemIndex} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground">{item.quantity}×</span>
+                              <span className="truncate">{item.name}</span>
+                            </div>
+                            <span className="text-muted-foreground">${item.total_price.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
           </div>
         </TabsContent>
 
