@@ -212,6 +212,9 @@ export const EventRunner = ({
         }
       }
       
+      // Generate a unique order_id for this transaction
+      const orderId = crypto.randomUUID();
+      
       // Update inventory and create sales records
       for (const cartItem of cart) {
         const item = items.find(i => i.id === cartItem.itemId)!;
@@ -225,14 +228,15 @@ export const EventRunner = ({
         
         if (updateError) throw updateError;
         
-        // Record sale
+        // Record sale with order_id to group items in same transaction
         const { error: saleError } = await supabase
           .from('event_sales')
           .insert({
             event_item_id: cartItem.itemId,
             quantity: cartItem.quantity,
             unit_price: cartItem.price,
-            total_price: cartItem.price * cartItem.quantity
+            total_price: cartItem.price * cartItem.quantity,
+            order_id: orderId
           });
         
         if (saleError) throw saleError;
@@ -314,7 +318,36 @@ export const EventRunner = ({
     loadEventDetails();
     loadDaySummaries();
     loadCategories();
+    loadOrderCount();
   }, [event.id]);
+  
+  // Load order count from database (count distinct order_ids)
+  const loadOrderCount = async () => {
+    // Get all event_item_ids for this event first
+    const { data: eventItems } = await supabase
+      .from('event_items')
+      .select('id')
+      .eq('event_id', event.id);
+    
+    if (!eventItems || eventItems.length === 0) {
+      setOrderCount(0);
+      return;
+    }
+    
+    const itemIds = eventItems.map(item => item.id);
+    
+    // Get distinct order_ids from sales for these items
+    const { data: sales } = await supabase
+      .from('event_sales')
+      .select('order_id')
+      .in('event_item_id', itemIds);
+    
+    if (sales) {
+      // Count distinct non-null order_ids
+      const uniqueOrderIds = new Set(sales.map(s => s.order_id).filter(Boolean));
+      setOrderCount(uniqueOrderIds.size);
+    }
+  };
   
   const loadCategories = async () => {
     const { data } = await supabase.from('categories').select('name, icon');
@@ -570,6 +603,7 @@ export const EventRunner = ({
   const totalItemsSold = items.reduce((sum, item) => sum + item.quantity_sold, 0);
   const totalInventory = items.reduce((sum, item) => sum + item.starting_quantity, 0);
   const avgOrderSize = orderCount > 0 ? totalRevenue / orderCount : 0;
+  const itemsPerOrder = orderCount > 0 ? totalItemsSold / orderCount : 0;
 
   // Calculate totals from all day summaries
   const allDaysRevenue = daySummaries.reduce((sum, d) => sum + d.revenue, 0);
@@ -1000,7 +1034,7 @@ export const EventRunner = ({
             {/* Left Side - Item Tiles */}
             <div className="flex-1 space-y-4">
               {/* Metrics Cards - Compact */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-5 gap-3">
                 <div className="bg-card rounded-lg p-3 border">
                   <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
                     <DollarSign className="w-3.5 h-3.5" />
@@ -1025,9 +1059,16 @@ export const EventRunner = ({
                 <div className="bg-card rounded-lg p-3 border">
                   <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
                     <TrendingUp className="w-3.5 h-3.5" />
-                    <span className="text-xs">Avg Order</span>
+                    <span className="text-xs">Avg Order $</span>
                   </div>
                   <p className="text-xl font-bold">${avgOrderSize.toFixed(2)}</p>
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                    <Package className="w-3.5 h-3.5" />
+                    <span className="text-xs">Items/Order</span>
+                  </div>
+                  <p className="text-xl font-bold">{itemsPerOrder.toFixed(1)}</p>
                 </div>
               </div>
 
@@ -1183,7 +1224,7 @@ export const EventRunner = ({
               </h3>
               <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">{currentDay} day{currentDay !== 1 ? 's' : ''}</span>
             </div>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-5 gap-4">
               <div className="text-center p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
                 <p className="text-2xl font-bold text-green-600">${(allDaysRevenue + totalRevenue).toFixed(0)}</p>
                 <p className="text-xs text-green-700 dark:text-green-400 font-medium">Revenue</p>
@@ -1198,7 +1239,11 @@ export const EventRunner = ({
               </div>
               <div className="text-center p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
                 <p className="text-2xl font-bold text-amber-600">${avgOrderSize.toFixed(2)}</p>
-                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Avg Order</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Avg Order $</p>
+              </div>
+              <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
+                <p className="text-2xl font-bold text-purple-600">{itemsPerOrder.toFixed(1)}</p>
+                <p className="text-xs text-purple-700 dark:text-purple-400 font-medium">Items/Order</p>
               </div>
             </div>
           </div>
