@@ -88,6 +88,7 @@ export const EventRunner = ({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [orderCount, setOrderCount] = useState(0);
   
   // Add new item state
   const [showAddItem, setShowAddItem] = useState(false);
@@ -243,6 +244,8 @@ export const EventRunner = ({
             : i
         ));
       }
+      
+      setOrderCount(prev => prev + 1);
       
       toast({
         title: 'Sale Complete!',
@@ -564,10 +567,9 @@ export const EventRunner = ({
 
   // Calculate metrics
   const totalRevenue = items.reduce((sum, item) => sum + item.price * item.quantity_sold, 0);
-  const totalCOGS = items.reduce((sum, item) => sum + item.cogs * item.quantity_sold, 0);
-  const totalProfit = totalRevenue - totalCOGS;
   const totalItemsSold = items.reduce((sum, item) => sum + item.quantity_sold, 0);
   const totalInventory = items.reduce((sum, item) => sum + item.starting_quantity, 0);
+  const avgOrderSize = orderCount > 0 ? totalRevenue / orderCount : 0;
 
   // Calculate totals from all day summaries
   const allDaysRevenue = daySummaries.reduce((sum, d) => sum + d.revenue, 0);
@@ -1008,24 +1010,24 @@ export const EventRunner = ({
                 </div>
                 <div className="bg-card rounded-lg p-3 border">
                   <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span className="text-xs">Profit</span>
-                  </div>
-                  <p className="text-xl font-bold text-pink-accent">${totalProfit.toFixed(2)}</p>
-                </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
                     <Package className="w-3.5 h-3.5" />
-                    <span className="text-xs">Sold</span>
+                    <span className="text-xs">Items Sold</span>
                   </div>
                   <p className="text-xl font-bold">{totalItemsSold}</p>
                 </div>
                 <div className="bg-card rounded-lg p-3 border">
                   <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
-                    <DollarSign className="w-3.5 h-3.5" />
-                    <span className="text-xs">COGS</span>
+                    <ShoppingCart className="w-3.5 h-3.5" />
+                    <span className="text-xs">Orders</span>
                   </div>
-                  <p className="text-xl font-bold text-muted-foreground">${totalCOGS.toFixed(2)}</p>
+                  <p className="text-xl font-bold">{orderCount}</p>
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span className="text-xs">Avg Order</span>
+                  </div>
+                  <p className="text-xl font-bold">${avgOrderSize.toFixed(2)}</p>
                 </div>
               </div>
 
@@ -1188,15 +1190,15 @@ export const EventRunner = ({
               </div>
               <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
                 <p className="text-2xl font-bold text-blue-600">{allDaysItemsSold + totalItemsSold}</p>
-                <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">Sold</p>
+                <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">Items Sold</p>
               </div>
               <div className="text-center p-3 bg-pink-soft/20 rounded-lg">
-                <p className="text-2xl font-bold text-pink-accent">${totalProfit.toFixed(0)}</p>
-                <p className="text-xs text-pink-accent font-medium">Profit</p>
+                <p className="text-2xl font-bold text-pink-accent">{orderCount}</p>
+                <p className="text-xs text-pink-accent font-medium">Orders</p>
               </div>
               <div className="text-center p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
-                <p className="text-2xl font-bold text-amber-600">${totalCOGS.toFixed(0)}</p>
-                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">COGS</p>
+                <p className="text-2xl font-bold text-amber-600">${avgOrderSize.toFixed(2)}</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Avg Order</p>
               </div>
             </div>
           </div>
@@ -1471,8 +1473,7 @@ export const EventRunner = ({
             <div className="bg-secondary rounded-lg p-4 space-y-2">
               <p><strong>Total Days:</strong> {currentDay}</p>
               <p><strong>Final Revenue:</strong> ${(allDaysRevenue + totalRevenue).toFixed(2)}</p>
-              <p><strong>Total COGS:</strong> ${totalCOGS.toFixed(2)}</p>
-              <p><strong>Net Profit:</strong> ${totalProfit.toFixed(2)}</p>
+              <p><strong>Total Orders:</strong> {orderCount}</p>
               <p><strong>Items Sold:</strong> {allDaysItemsSold + totalItemsSold} / {totalInventory}</p>
             </div>
           </div>
