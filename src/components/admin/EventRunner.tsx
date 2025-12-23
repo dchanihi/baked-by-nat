@@ -997,11 +997,11 @@ export const EventRunner = ({
 
         <TabsContent value="sales" className="mt-4">
           {/* POS Layout - Two Column */}
-          <div className="flex gap-6">
+          <div className="flex gap-6 h-[calc(100vh-16rem)]">
             {/* Left Side - Item Tiles */}
-            <div className="flex-1 space-y-4">
-              {/* Metrics Cards - Compact */}
-              <div className="grid grid-cols-5 gap-3">
+            <div className="flex-1 flex flex-col min-h-0">
+              {/* Metrics Cards - Compact (Fixed) */}
+              <div className="grid grid-cols-5 gap-3 flex-shrink-0">
                 <div className="bg-card rounded-lg p-3 border">
                   <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
                     <DollarSign className="w-3.5 h-3.5" />
@@ -1039,8 +1039,8 @@ export const EventRunner = ({
                 </div>
               </div>
 
-              {/* Search and Filter Controls */}
-              <div className="flex flex-col sm:flex-row gap-3">
+              {/* Search and Filter Controls (Fixed) */}
+              <div className="flex flex-col sm:flex-row gap-3 mt-4 flex-shrink-0">
                 {/* Search */}
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -1071,61 +1071,63 @@ export const EventRunner = ({
                 </Select>
               </div>
 
-              {/* POS Item Tiles Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {filteredItems.map(item => {
-                const remaining = item.starting_quantity - item.quantity_sold;
-                const cartQty = getCartQuantity(item.id);
-                const isOutOfStock = remaining <= 0;
-                const CategoryIcon = getCategoryIcon(item.category);
-                return <motion.button key={item.id} whileTap={{
-                  scale: 0.95
-                }} onClick={() => !isOutOfStock && addToCart(item)} disabled={isOutOfStock} className={`relative aspect-square p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center
-                        ${isOutOfStock ? 'bg-muted/50 border-muted cursor-not-allowed opacity-60' : 'bg-card border-border hover:border-pink-soft hover:shadow-lg cursor-pointer active:bg-pink-soft/10'}
-                        ${cartQty > 0 ? 'border-pink-soft bg-pink-soft/5' : ''}
-                      `}>
-                      {/* Cart Badge */}
-                      {cartQty > 0 && <Badge className="absolute -top-2 -right-2 bg-pink-soft hover:bg-pink-soft text-white h-6 w-6 p-0 flex items-center justify-center rounded-full text-xs font-bold">
-                          {cartQty}
-                        </Badge>}
-                      
-                      {/* Category Icon */}
-                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${isOutOfStock ? 'bg-muted' : 'bg-pink-soft/10'}`}>
-                        <CategoryIcon className={`w-8 h-8 ${isOutOfStock ? 'text-muted-foreground' : 'text-pink-soft'}`} />
-                      </div>
-                      
-                      {/* Item Name */}
-                      <span className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</span>
-                      
-                      {/* Price */}
-                      <span className="text-lg font-bold text-primary">${item.price.toFixed(2)}</span>
-                      
-                      {/* Remaining */}
-                      <span className={`text-xs ${isOutOfStock ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                        {isOutOfStock ? 'Out of stock' : `${remaining} left`}
-                      </span>
-                    </motion.button>;
-              })}
-              </div>
+              {/* POS Item Tiles Grid (Scrollable) */}
+              <ScrollArea className="flex-1 mt-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pr-4">
+                  {filteredItems.map(item => {
+                  const remaining = item.starting_quantity - item.quantity_sold;
+                  const cartQty = getCartQuantity(item.id);
+                  const isOutOfStock = remaining <= 0;
+                  const CategoryIcon = getCategoryIcon(item.category);
+                  return <motion.button key={item.id} whileTap={{
+                    scale: 0.95
+                  }} onClick={() => !isOutOfStock && addToCart(item)} disabled={isOutOfStock} className={`relative aspect-square p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center
+                          ${isOutOfStock ? 'bg-muted/50 border-muted cursor-not-allowed opacity-60' : 'bg-card border-border hover:border-pink-soft hover:shadow-lg cursor-pointer active:bg-pink-soft/10'}
+                          ${cartQty > 0 ? 'border-pink-soft bg-pink-soft/5' : ''}
+                        `}>
+                        {/* Cart Badge */}
+                        {cartQty > 0 && <Badge className="absolute -top-2 -right-2 bg-pink-soft hover:bg-pink-soft text-white h-6 w-6 p-0 flex items-center justify-center rounded-full text-xs font-bold">
+                            {cartQty}
+                          </Badge>}
+                        
+                        {/* Category Icon */}
+                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${isOutOfStock ? 'bg-muted' : 'bg-pink-soft/10'}`}>
+                          <CategoryIcon className={`w-8 h-8 ${isOutOfStock ? 'text-muted-foreground' : 'text-pink-soft'}`} />
+                        </div>
+                        
+                        {/* Item Name */}
+                        <span className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</span>
+                        
+                        {/* Price */}
+                        <span className="text-lg font-bold text-primary">${item.price.toFixed(2)}</span>
+                        
+                        {/* Remaining */}
+                        <span className={`text-xs ${isOutOfStock ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                          {isOutOfStock ? 'Out of stock' : `${remaining} left`}
+                        </span>
+                      </motion.button>;
+                })}
+                </div>
 
-              {filteredItems.length === 0 && items.length > 0 && <div className="text-center py-12 text-muted-foreground">
-                  <p>No items match your search or filter.</p>
-                  <Button variant="link" onClick={() => {
-                setSearchQuery('');
-                setSelectedCategory('all');
-              }}>
-                    Clear filters
-                  </Button>
-                </div>}
+                {filteredItems.length === 0 && items.length > 0 && <div className="text-center py-12 text-muted-foreground">
+                    <p>No items match your search or filter.</p>
+                    <Button variant="link" onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('all');
+                }}>
+                      Clear filters
+                    </Button>
+                  </div>}
 
-              {items.length === 0 && <div className="text-center py-12 text-muted-foreground">
-                  <p>No items in this event. Go back and add some inventory first.</p>
-                </div>}
+                {items.length === 0 && <div className="text-center py-12 text-muted-foreground">
+                    <p>No items in this event. Go back and add some inventory first.</p>
+                  </div>}
+              </ScrollArea>
             </div>
 
             {/* Right Side - Cart Sidebar (Desktop) */}
-            <div className="hidden lg:block w-80">
-              <div className="sticky top-4 h-[calc(100vh-16rem)] rounded-xl overflow-hidden border bg-card">
+            <div className="hidden lg:block w-80 flex-shrink-0">
+              <div className="h-full rounded-xl overflow-hidden border bg-card">
                 <CartSidebar />
               </div>
             </div>
