@@ -643,7 +643,7 @@ export const EventRunner = ({
             <p className="text-sm">Tap items to add them</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 w-full">
             <AnimatePresence mode="popLayout">
               {cart.map((cartItem) => {
                 const CategoryIcon = getCategoryIcon(cartItem.category);
@@ -654,46 +654,46 @@ export const EventRunner = ({
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: 50 }}
-                    className="bg-secondary/50 rounded-lg p-3"
+                    className="bg-secondary/50 rounded-lg p-3 w-full"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-pink-soft/10 flex items-center justify-center flex-shrink-0">
-                        <CategoryIcon className="w-5 h-5 text-pink-soft" />
+                    <div className="flex items-start gap-2 w-full">
+                      <div className="w-8 h-8 rounded-lg bg-pink-soft/10 flex items-center justify-center flex-shrink-0">
+                        <CategoryIcon className="w-4 h-4 text-pink-soft" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{cartItem.name}</p>
-                        <p className="text-sm text-muted-foreground">${cartItem.price.toFixed(2)} each</p>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className="font-medium text-sm truncate">{cartItem.name}</p>
+                        <p className="text-xs text-muted-foreground">${cartItem.price.toFixed(2)} ea</p>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => removeFromCart(cartItem.itemId)}
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive flex-shrink-0"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-3 h-3" />
                       </Button>
                     </div>
                     <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => updateCartQuantity(cartItem.itemId, cartItem.quantity - 1)}
-                          className="h-8 w-8 p-0"
+                          className="h-7 w-7 p-0"
                         >
-                          <Minus className="w-4 h-4" />
+                          <Minus className="w-3 h-3" />
                         </Button>
-                        <span className="w-8 text-center font-medium">{cartItem.quantity}</span>
+                        <span className="w-6 text-center font-medium text-sm">{cartItem.quantity}</span>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => updateCartQuantity(cartItem.itemId, cartItem.quantity + 1)}
-                          className="h-8 w-8 p-0"
+                          className="h-7 w-7 p-0"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className="w-3 h-3" />
                         </Button>
                       </div>
-                      <span className="font-semibold">${(cartItem.price * cartItem.quantity).toFixed(2)}</span>
+                      <span className="font-semibold text-sm">${(cartItem.price * cartItem.quantity).toFixed(2)}</span>
                     </div>
                   </motion.div>
                 );
