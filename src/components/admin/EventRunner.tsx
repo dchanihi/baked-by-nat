@@ -670,7 +670,7 @@ export const EventRunner = ({
     isMobile = false
   }: {
     isMobile?: boolean;
-  }) => <div className={`flex flex-col ${isMobile ? 'h-full' : 'max-h-[calc(100vh-8rem)]'} ${isMobile ? '' : 'bg-card'}`}>
+  }) => <div className={`flex flex-col h-full ${isMobile ? '' : 'bg-card'}`}>
       {/* Cart Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
@@ -1125,7 +1125,7 @@ export const EventRunner = ({
 
             {/* Right Side - Cart Sidebar (Desktop) */}
             <div className="hidden lg:block w-80 flex-shrink-0">
-              <div className="sticky top-4 max-h-[calc(100vh-6rem)] h-fit rounded-xl overflow-hidden border bg-card flex flex-col">
+              <div className="fixed top-24 right-8 w-80 h-[calc(100vh-7rem)] rounded-xl overflow-hidden border bg-card flex flex-col shadow-lg">
                 <CartSidebar />
               </div>
             </div>
