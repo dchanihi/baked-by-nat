@@ -670,7 +670,7 @@ export const EventRunner = ({
     isMobile = false
   }: {
     isMobile?: boolean;
-  }) => <div className={`flex flex-col h-full ${isMobile ? '' : 'bg-card'}`}>
+  }) => <div className={`flex flex-col h-full ${isMobile ? '' : 'bg-card border-l'}`}>
       {/* Cart Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
@@ -686,7 +686,7 @@ export const EventRunner = ({
       </div>
       
       {/* Cart Items */}
-      <ScrollArea className="flex-1 min-h-0 p-4">
+      <ScrollArea className="flex-1 p-4">
         {cart.length === 0 ? <div className="text-center py-12 text-muted-foreground">
             <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className="font-medium">Cart is empty</p>
@@ -736,7 +736,7 @@ export const EventRunner = ({
       </ScrollArea>
       
       {/* Cart Footer */}
-      <div className="p-4 border-t space-y-3 bg-background flex-shrink-0">
+      <div className="p-4 border-t space-y-4 bg-background">
         <div className="flex items-center justify-between text-lg font-bold">
           <span>Total</span>
           <span className="text-primary">${cartTotal.toFixed(2)}</span>
@@ -1124,8 +1124,8 @@ export const EventRunner = ({
             </div>
 
             {/* Right Side - Cart Sidebar (Desktop) */}
-            <div className="hidden lg:block w-80 flex-shrink-0">
-              <div className="fixed top-24 right-8 w-80 h-[calc(100vh-7rem)] rounded-xl overflow-hidden border bg-card flex flex-col shadow-lg">
+            <div className="hidden lg:block w-80">
+              <div className="sticky top-4 h-[calc(100vh-8rem)] rounded-xl overflow-hidden border bg-card">
                 <CartSidebar />
               </div>
             </div>
