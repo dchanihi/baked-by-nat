@@ -1551,45 +1551,70 @@ export const EventRunner = ({
             })}
           </div>
 
-          {/* Items Sold Distribution - Mini Visual */}
+          {/* Top Sellers - Horizontal Bar Chart */}
           {items.length > 0 && (
             <div className="bg-card rounded-xl border p-4">
-              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+              <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
                 <Package className="w-4 h-4 text-primary" />
                 Top Sellers
               </h4>
-              <div className="space-y-2">
-                {items
-                  .filter(item => item.quantity_sold > 0)
-                  .sort((a, b) => b.quantity_sold - a.quantity_sold)
-                  .slice(0, 5)
-                  .map(item => {
-                    const maxSold = Math.max(...items.map(i => i.quantity_sold), 1);
-                    const percent = (item.quantity_sold / maxSold) * 100;
-                    const CategoryIcon = getCategoryIcon(item.category);
-                    
-                    return (
-                      <div key={item.id} className="flex items-center gap-2">
-                        <CategoryIcon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between text-xs mb-0.5">
-                            <span className="truncate font-medium">{item.name}</span>
-                            <span className="text-muted-foreground ml-2">{item.quantity_sold}</span>
+              {items.filter(item => item.quantity_sold > 0).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No sales yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {items
+                    .filter(item => item.quantity_sold > 0)
+                    .sort((a, b) => b.quantity_sold - a.quantity_sold)
+                    .slice(0, 8)
+                    .map((item, index) => {
+                      const maxSold = Math.max(...items.map(i => i.quantity_sold), 1);
+                      const percent = (item.quantity_sold / maxSold) * 100;
+                      const CategoryIcon = getCategoryIcon(item.category);
+                      
+                      // Color gradient from most to least popular
+                      const colors = [
+                        'bg-pink-soft',
+                        'bg-pink-soft/90',
+                        'bg-pink-soft/80',
+                        'bg-pink-soft/70',
+                        'bg-pink-soft/60',
+                        'bg-pink-soft/50',
+                        'bg-pink-soft/40',
+                        'bg-pink-soft/30',
+                      ];
+                      const barColor = colors[index] || colors[colors.length - 1];
+                      
+                      return (
+                        <div key={item.id} className="group">
+                          <div className="flex items-center gap-3 mb-1">
+                            <div className="w-6 h-6 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
+                              <CategoryIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                            </div>
+                            <span className="text-sm font-medium flex-1 truncate">{item.name}</span>
+                            <span className="text-sm font-bold text-primary">{item.quantity_sold}</span>
                           </div>
-                          <div className="w-full bg-secondary rounded-full h-1">
-                            <div 
-                              className="bg-pink-soft h-1 rounded-full transition-all" 
-                              style={{ width: `${percent}%` }} 
-                            />
+                          <div className="flex items-center gap-3">
+                            <div className="w-6 flex-shrink-0" /> {/* Spacer for alignment */}
+                            <div className="flex-1 bg-secondary/50 rounded-full h-4 overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${percent}%` }}
+                                transition={{ duration: 0.5, delay: index * 0.05, ease: "easeOut" }}
+                                className={`${barColor} h-full rounded-full flex items-center justify-end pr-2`}
+                              >
+                                {percent > 25 && (
+                                  <span className="text-[10px] font-medium text-white/90">
+                                    ${(item.price * item.quantity_sold).toFixed(0)}
+                                  </span>
+                                )}
+                              </motion.div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                {items.filter(item => item.quantity_sold > 0).length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-2">No sales yet</p>
-                )}
-              </div>
+                      );
+                    })}
+                </div>
+              )}
             </div>
           )}
         </TabsContent>
