@@ -133,6 +133,50 @@ export type Database = {
           },
         ]
       }
+      event_deals: {
+        Row: {
+          category: string | null
+          created_at: string
+          deal_price: number
+          description: string | null
+          event_id: string
+          id: string
+          name: string
+          quantity_required: number
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          deal_price: number
+          description?: string | null
+          event_id: string
+          id?: string
+          name: string
+          quantity_required?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          deal_price?: number
+          description?: string | null
+          event_id?: string
+          id?: string
+          name?: string
+          quantity_required?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_deals_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_items: {
         Row: {
           bake_id: string | null

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Trash2, Link, Package, Filter, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Link, Package, Filter, Calendar as CalendarIcon, Clock, Tag } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -53,6 +53,15 @@ interface ScheduleDay {
 
 type ScheduleMode = 'same' | 'different';
 
+interface EventDeal {
+  id?: string;
+  name: string;
+  description: string;
+  quantity_required: number;
+  category: string | null;
+  deal_price: number;
+}
+
 interface Event {
   id: string;
   name: string;
@@ -87,6 +96,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
   const [dragStartDate, setDragStartDate] = useState<Date | null>(null);
   const [dragEndDate, setDragEndDate] = useState<Date | null>(null);
   const [items, setItems] = useState<EventItem[]>([]);
+  const [deals, setDeals] = useState<EventDeal[]>([]);
   const [bakes, setBakes] = useState<Bake[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
@@ -192,8 +202,27 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
     if (event) {
       loadEventItems();
       loadScheduleDays();
+      loadEventDeals();
     }
   }, [event]);
+
+  const loadEventDeals = async () => {
+    if (!event) return;
+    const { data } = await supabase
+      .from('event_deals')
+      .select('*')
+      .eq('event_id', event.id);
+    if (data) {
+      setDeals(data.map(d => ({
+        id: d.id,
+        name: d.name,
+        description: d.description || '',
+        quantity_required: d.quantity_required,
+        category: d.category,
+        deal_price: Number(d.deal_price),
+      })));
+    }
+  };
 
   const loadScheduleDays = async () => {
     if (!event) return;
@@ -482,6 +511,27 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
     setItems(items.filter((_, i) => i !== index));
   };
 
+  // Deal management functions
+  const addDeal = () => {
+    setDeals([...deals, {
+      name: '',
+      description: '',
+      quantity_required: 2,
+      category: null,
+      deal_price: 0,
+    }]);
+  };
+
+  const updateDeal = (index: number, field: keyof EventDeal, value: string | number | null) => {
+    const updated = [...deals];
+    updated[index] = { ...updated[index], [field]: value };
+    setDeals(updated);
+  };
+
+  const removeDeal = (index: number) => {
+    setDeals(deals.filter((_, i) => i !== index));
+  };
+
   const handleSave = async () => {
     if (!name || scheduleDays.length === 0 || !scheduleDays[0].date) {
       toast({
@@ -618,6 +668,32 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
           );
         
         if (scheduleError) throw scheduleError;
+
+        // Save deals
+        // Delete existing deals
+        await supabase
+          .from('event_deals')
+          .delete()
+          .eq('event_id', eventId);
+        
+        // Insert new deals (only non-empty ones)
+        const dealsToInsert = deals.filter(d => d.name.trim());
+        if (dealsToInsert.length > 0) {
+          const { error: dealsError } = await supabase
+            .from('event_deals')
+            .insert(
+              dealsToInsert.map(deal => ({
+                event_id: eventId,
+                name: deal.name,
+                description: deal.description || null,
+                quantity_required: deal.quantity_required,
+                category: deal.category,
+                deal_price: deal.deal_price,
+              }))
+            );
+          
+          if (dealsError) throw dealsError;
+        }
       }
 
       toast({
@@ -987,6 +1063,120 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
             placeholder="Internal notes for this event..."
             rows={2}
           />
+        </div>
+
+        {/* Deals Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label className="text-lg font-medium flex items-center gap-2">
+              <Tag className="w-5 h-5" />
+              Deals & Bundles
+            </Label>
+            <Button variant="outline" size="sm" onClick={addDeal}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Deal
+            </Button>
+          </div>
+          
+          {deals.length === 0 ? (
+            <div className="border rounded-lg p-6 text-center text-muted-foreground bg-muted/10">
+              <Tag className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No deals configured for this event.</p>
+              <p className="text-xs mt-1">Add deals like "2 cookies for $5" to offer bundle pricing.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <AnimatePresence mode="popLayout">
+                {deals.map((deal, index) => (
+                  <motion.div
+                    key={deal.id || `new-deal-${index}`}
+                    layout
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                    className="border rounded-lg p-4 bg-card space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Deal Name</Label>
+                          <Input
+                            value={deal.name}
+                            onChange={(e) => updateDeal(index, 'name', e.target.value)}
+                            placeholder="e.g., Cookie Bundle"
+                            className="h-9"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Description (shown to customers)</Label>
+                          <Input
+                            value={deal.description}
+                            onChange={(e) => updateDeal(index, 'description', e.target.value)}
+                            placeholder="e.g., Buy 2 cookies for $5!"
+                            className="h-9"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeDeal(index)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Quantity Required</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={deal.quantity_required}
+                          onChange={(e) => updateDeal(index, 'quantity_required', parseInt(e.target.value) || 1)}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Applies to Category</Label>
+                        <Select
+                          value={deal.category || 'all'}
+                          onValueChange={(val) => updateDeal(index, 'category', val === 'all' ? null : val)}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="All categories" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All categories</SelectItem>
+                            {categories.map((cat) => {
+                              const Icon = getIconComponent(cat.icon);
+                              return (
+                                <SelectItem key={cat.id} value={cat.name}>
+                                  <span className="flex items-center gap-2">
+                                    <Icon className="w-4 h-4" />
+                                    {cat.name}
+                                  </span>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Bundle Price ($)</Label>
+                        <CurrencyInput
+                          value={deal.deal_price}
+                          onChange={(val) => updateDeal(index, 'deal_price', val)}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
         {/* Items Section */}
