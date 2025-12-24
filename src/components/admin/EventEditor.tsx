@@ -1215,7 +1215,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
               </Dialog>
               <Button variant="outline" size="sm" onClick={addItem}>
                 <Plus className="w-4 h-4 mr-2" />
-                Add Custom
+                Add Item
               </Button>
             </div>
           </div>
