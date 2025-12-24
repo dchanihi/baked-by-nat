@@ -1164,8 +1164,8 @@ export const EventRunner = ({
           <div className="flex gap-6 h-[calc(100vh-16rem)]">
             {/* Left Side - Item Tiles */}
             <div className="flex-1 flex flex-col min-h-0">
-              {/* Metrics Cards - Ultra Compact Row (Fixed) */}
-              <div className="flex gap-2 flex-shrink-0 flex-wrap">
+              {/* Metrics and Deals Row (Fixed) */}
+              <div className="flex gap-2 flex-shrink-0 flex-wrap items-center">
                 <div className="bg-card rounded-lg px-3 py-2 border flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-primary" />
                   <div>
@@ -1194,38 +1194,23 @@ export const EventRunner = ({
                     <p className="text-lg font-bold leading-none">${avgOrderSize.toFixed(2)}</p>
                   </div>
                 </div>
-              </div>
 
-              {/* Available Deals Section */}
-              {deals.length > 0 && (
-                <div className="mt-3 flex-shrink-0">
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-lg p-3 border border-green-200 dark:border-green-800">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Tag className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-sm font-medium text-green-700 dark:text-green-400">Available Deals</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {deals.map(deal => {
-                        const CategoryIcon = getCategoryIcon(deal.category);
-                        return (
-                          <div
-                            key={deal.id}
-                            className="bg-white dark:bg-green-900/30 rounded-md px-3 py-1.5 border border-green-200 dark:border-green-700 flex items-center gap-2"
-                          >
-                            <CategoryIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
-                            <div className="text-sm">
-                              <span className="font-medium text-green-700 dark:text-green-300">{deal.name}</span>
-                              <span className="text-green-600 dark:text-green-400 ml-1">
-                                ({deal.quantity_required} for ${deal.deal_price.toFixed(2)})
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                {/* Available Deals - Compact inline */}
+                {deals.length > 0 && (
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <Tag className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                    {deals.map(deal => (
+                      <Badge
+                        key={deal.id}
+                        variant="outline"
+                        className="bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-xs font-normal"
+                      >
+                        {deal.quantity_required} {deal.category || 'items'} → ${deal.deal_price.toFixed(0)}
+                      </Badge>
+                    ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Search and Filter Controls (Fixed) */}
               <div className="flex flex-col sm:flex-row gap-3 mt-4 flex-shrink-0">
