@@ -516,7 +516,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
     setDeals([...deals, {
       name: '',
       description: '',
-      quantity_required: 2,
+      quantity_required: 0,
       category: null,
       deal_price: 0,
     }]);
@@ -1133,10 +1133,11 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                         <Label className="text-xs text-muted-foreground">Quantity Required</Label>
                         <Input
                           type="number"
-                          min={1}
-                          value={deal.quantity_required}
-                          onChange={(e) => updateDeal(index, 'quantity_required', parseInt(e.target.value) || 1)}
+                          min={0}
+                          value={deal.quantity_required === 0 ? '' : deal.quantity_required}
+                          onChange={(e) => updateDeal(index, 'quantity_required', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                           className="h-9"
+                          placeholder="0"
                         />
                       </div>
                       <div className="space-y-1.5">
