@@ -156,6 +156,7 @@ export const EventRunner = ({
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   // Calculate applied deals - applies to ALL products within a category (MIX AND MATCH)
+  // IMPORTANT: Deals only apply IN FULL when quantity threshold is met - NO partial discounts
   const { appliedDeals, cartTotal, totalSavings } = useMemo(() => {
     console.log('%c[DEAL DEBUG] ===== Starting Deal Calculation =====', 'background: #222; color: #bada55; font-weight: bold');
     console.log('[DEAL DEBUG] Available deals:', JSON.stringify(deals, null, 2));
@@ -170,97 +171,110 @@ export const EventRunner = ({
     const appliedDeals: AppliedDeal[] = [];
     let totalSavings = 0;
 
-    // Step 1: Group ALL cart items by their category (case-insensitive)
-    // This enables MIX AND MATCH - different items in same category count together
-    const categoryQuantities: Record<string, { quantity: number; totalValue: number; items: CartItem[] }> = {};
+    // Step 1: Expand cart items into individual units for accurate deal application
+    // This allows us to pick specific items for each deal bundle
+    interface ExpandedItem {
+      itemId: string;
+      name: string;
+      price: number;
+      category: string;
+    }
     
-    console.log('%c[DEAL DEBUG] Step 1: Grouping cart items by category...', 'color: cyan');
+    const expandedItems: ExpandedItem[] = [];
     cart.forEach(cartItem => {
-      // Normalize category to lowercase for consistent matching
       const category = (cartItem.category || 'uncategorized').toLowerCase().trim();
-      console.log(`[DEAL DEBUG]   - Item: "${cartItem.name}" | Category: "${category}" | Qty: ${cartItem.quantity} | Price: $${cartItem.price}`);
-      
-      if (!categoryQuantities[category]) {
-        categoryQuantities[category] = { quantity: 0, totalValue: 0, items: [] };
+      for (let i = 0; i < cartItem.quantity; i++) {
+        expandedItems.push({
+          itemId: cartItem.itemId,
+          name: cartItem.name,
+          price: cartItem.price,
+          category
+        });
       }
-      categoryQuantities[category].quantity += cartItem.quantity;
-      categoryQuantities[category].totalValue += cartItem.price * cartItem.quantity;
-      categoryQuantities[category].items.push(cartItem);
     });
 
-    console.log('%c[DEAL DEBUG] Step 2: Category totals (MIX AND MATCH enabled):', 'color: cyan');
-    Object.entries(categoryQuantities).forEach(([cat, data]) => {
-      console.log(`[DEAL DEBUG]   - Category "${cat}": ${data.quantity} total items, $${data.totalValue.toFixed(2)} total value`);
-      console.log(`[DEAL DEBUG]     Items in this category:`, data.items.map(i => `${i.name} x${i.quantity}`).join(', '));
+    console.log('%c[DEAL DEBUG] Step 1: Expanded cart into individual units', 'color: cyan');
+    console.log(`[DEAL DEBUG]   Total units: ${expandedItems.length}`);
+
+    // Step 2: Group expanded items by category
+    const itemsByCategory: Record<string, ExpandedItem[]> = {};
+    expandedItems.forEach(item => {
+      if (!itemsByCategory[item.category]) {
+        itemsByCategory[item.category] = [];
+      }
+      itemsByCategory[item.category].push(item);
     });
 
-    // Step 2: Check each deal against the category totals
-    console.log('%c[DEAL DEBUG] Step 3: Checking deals against category totals...', 'color: cyan');
+    console.log('%c[DEAL DEBUG] Step 2: Items grouped by category', 'color: cyan');
+    Object.entries(itemsByCategory).forEach(([cat, items]) => {
+      console.log(`[DEAL DEBUG]   Category "${cat}": ${items.length} items, prices: [${items.map(i => '$' + i.price).join(', ')}]`);
+    });
+
+    // Step 3: For each deal, apply it to the category items
+    // Sort items by price (highest first) so deals apply to most expensive items = max savings for customer
+    console.log('%c[DEAL DEBUG] Step 3: Applying deals (NO partial discounts)', 'color: cyan');
+    
     deals.forEach(deal => {
       console.log(`%c[DEAL DEBUG] --- Evaluating deal: "${deal.name}" ---`, 'color: yellow');
-      console.log(`[DEAL DEBUG]   Deal config: category="${deal.category}", qty_required=${deal.quantity_required}, deal_price=$${deal.deal_price}`);
+      console.log(`[DEAL DEBUG]   Config: category="${deal.category}", qty_required=${deal.quantity_required}, deal_price=$${deal.deal_price}`);
       
-      // Skip deals without valid quantity requirement
       if (!deal.quantity_required || deal.quantity_required < 1) {
         console.log('[DEAL DEBUG]   ⛔ Skipping - invalid quantity requirement');
         return;
       }
       
-      // Normalize deal category to lowercase for matching
       const dealCategory = (deal.category || 'uncategorized').toLowerCase().trim();
-      const catData = categoryQuantities[dealCategory];
+      const categoryItems = itemsByCategory[dealCategory];
       
-      console.log(`[DEAL DEBUG]   Looking for category "${dealCategory}" in cart...`);
-      
-      if (!catData) {
-        console.log(`[DEAL DEBUG]   ❌ Category "${dealCategory}" NOT FOUND in cart`);
-        console.log(`[DEAL DEBUG]   Available categories:`, Object.keys(categoryQuantities));
+      if (!categoryItems || categoryItems.length === 0) {
+        console.log(`[DEAL DEBUG]   ❌ Category "${dealCategory}" not in cart`);
         return;
       }
-      
-      console.log(`[DEAL DEBUG]   ✓ Found! Category "${dealCategory}" has ${catData.quantity} TOTAL items (need ${deal.quantity_required} for deal)`);
-      
-      // Check if we have enough items to meet the requirement
-      if (catData.quantity < deal.quantity_required) {
-        const needed = deal.quantity_required - catData.quantity;
-        console.log(`[DEAL DEBUG]   ❌ NOT ENOUGH ITEMS - need ${needed} more items in "${dealCategory}" category`);
-        console.log(`[DEAL DEBUG]   TIP: Add any item from "${dealCategory}" category to reach ${deal.quantity_required} items`);
+
+      const totalInCategory = categoryItems.length;
+      console.log(`[DEAL DEBUG]   Found ${totalInCategory} items in "${dealCategory}" category`);
+
+      // Check if we meet the threshold
+      if (totalInCategory < deal.quantity_required) {
+        const needed = deal.quantity_required - totalInCategory;
+        console.log(`%c[DEAL DEBUG]   ❌ THRESHOLD NOT MET - need ${needed} more item(s)`, 'color: orange');
+        console.log(`[DEAL DEBUG]   NO DISCOUNT applied (no partial discounts)`);
         return;
       }
+
+      // Calculate how many COMPLETE deals we can apply
+      const timesApplied = Math.floor(totalInCategory / deal.quantity_required);
+      const itemsInDeals = timesApplied * deal.quantity_required;
+      const remainingItems = totalInCategory - itemsInDeals;
+
+      console.log(`%c[DEAL DEBUG]   ✓ THRESHOLD MET! Applying ${timesApplied} complete deal(s)`, 'color: lime');
+      console.log(`[DEAL DEBUG]   Items breakdown: ${itemsInDeals} in deals, ${remainingItems} at regular price`);
+
+      // Sort items by price descending (most expensive first)
+      // This way, deals apply to the most expensive items = maximum savings
+      const sortedItems = [...categoryItems].sort((a, b) => b.price - a.price);
       
-      // Calculate how many times this deal can be applied
-      const timesApplied = Math.floor(catData.quantity / deal.quantity_required);
-      const itemsUsedInDeals = timesApplied * deal.quantity_required;
-      const remainingItems = catData.quantity - itemsUsedInDeals;
-      
-      console.log(`[DEAL DEBUG]   ✓ Deal qualifies! Can apply ${timesApplied} time(s)`);
-      console.log(`[DEAL DEBUG]   Items breakdown: ${itemsUsedInDeals} in deals, ${remainingItems} at regular price`);
-      
-      // Calculate average price per item in this category for fair savings calculation
-      const avgPricePerItem = catData.totalValue / catData.quantity;
-      console.log(`[DEAL DEBUG]   Average price per item in category: $${avgPricePerItem.toFixed(2)}`);
-      
-      // Calculate savings: (regular price for deal qty) - (deal price)
-      const regularPriceForDealQty = avgPricePerItem * deal.quantity_required;
-      const savingsPerDeal = regularPriceForDealQty - deal.deal_price;
-      const totalDealSavings = savingsPerDeal * timesApplied;
-      
-      console.log(`[DEAL DEBUG]   Regular price for ${deal.quantity_required} items: $${regularPriceForDealQty.toFixed(2)}`);
-      console.log(`[DEAL DEBUG]   Deal price: $${deal.deal_price.toFixed(2)}`);
-      console.log(`[DEAL DEBUG]   Savings per deal application: $${savingsPerDeal.toFixed(2)}`);
-      console.log(`[DEAL DEBUG]   Total savings (${timesApplied}x): $${totalDealSavings.toFixed(2)}`);
-      
-      // Only add if there are actual savings
-      if (totalDealSavings > 0) {
+      // Calculate what the items in the deals would cost at regular price
+      const itemsForDeals = sortedItems.slice(0, itemsInDeals);
+      const regularPriceForDealItems = itemsForDeals.reduce((sum, item) => sum + item.price, 0);
+      const dealPriceTotal = deal.deal_price * timesApplied;
+      const savings = regularPriceForDealItems - dealPriceTotal;
+
+      console.log(`[DEAL DEBUG]   Items included in deals: [${itemsForDeals.map(i => i.name + ' $' + i.price).join(', ')}]`);
+      console.log(`[DEAL DEBUG]   Regular price for ${itemsInDeals} items: $${regularPriceForDealItems.toFixed(2)}`);
+      console.log(`[DEAL DEBUG]   Deal price (${timesApplied} x $${deal.deal_price}): $${dealPriceTotal.toFixed(2)}`);
+      console.log(`[DEAL DEBUG]   SAVINGS: $${savings.toFixed(2)}`);
+
+      if (savings > 0) {
         appliedDeals.push({
           deal,
           timesApplied,
-          savings: totalDealSavings
+          savings
         });
-        totalSavings += totalDealSavings;
-        console.log(`%c[DEAL DEBUG]   ✅ DEAL APPLIED: "${deal.name}" x${timesApplied}, SAVING $${totalDealSavings.toFixed(2)}`, 'color: lime; font-weight: bold');
+        totalSavings += savings;
+        console.log(`%c[DEAL DEBUG]   ✅ DEAL APPLIED: "${deal.name}" x${timesApplied}, SAVED $${savings.toFixed(2)}`, 'color: lime; font-weight: bold');
       } else {
-        console.log(`[DEAL DEBUG]   ⚠️ Deal not applied - no savings (deal price >= regular price)`);
+        console.log(`[DEAL DEBUG]   ⚠️ No savings - deal price >= regular price`);
       }
     });
 
@@ -270,7 +284,11 @@ export const EventRunner = ({
     console.log(`[DEAL DEBUG]   - Subtotal: $${cartSubtotal.toFixed(2)}`);
     console.log(`[DEAL DEBUG]   - Total savings: $${totalSavings.toFixed(2)}`);
     console.log(`[DEAL DEBUG]   - Final total: $${finalTotal.toFixed(2)}`);
-    console.log('[DEAL DEBUG] Applied deals:', appliedDeals.map(d => `${d.deal.name} x${d.timesApplied} (-$${d.savings.toFixed(2)})`));
+    if (appliedDeals.length > 0) {
+      console.log('[DEAL DEBUG] Applied deals:', appliedDeals.map(d => `${d.deal.name} x${d.timesApplied} (-$${d.savings.toFixed(2)})`));
+    } else {
+      console.log('[DEAL DEBUG] No deals applied');
+    }
 
     return {
       appliedDeals,
