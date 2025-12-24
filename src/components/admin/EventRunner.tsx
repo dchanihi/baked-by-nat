@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3, Search, Filter, X, ShoppingCart, Trash2, History, Receipt } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3, Search, Filter, X, ShoppingCart, Trash2, History, Receipt, Tag, Percent } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -51,6 +51,19 @@ interface DaySummary {
   revenue: number;
   items_sold: number;
 }
+interface EventDeal {
+  id: string;
+  name: string;
+  description: string | null;
+  quantity_required: number;
+  category: string | null;
+  deal_price: number;
+}
+interface AppliedDeal {
+  deal: EventDeal;
+  timesApplied: number;
+  savings: number;
+}
 interface EventRunnerProps {
   event: Event;
   onBack: () => void;
@@ -86,6 +99,9 @@ export const EventRunner = ({
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [orderCount, setOrderCount] = useState(0);
+
+  // Deals state
+  const [deals, setDeals] = useState<EventDeal[]>([]);
 
   // Add new item state
   const [showAddItem, setShowAddItem] = useState(false);
@@ -135,9 +151,69 @@ export const EventRunner = ({
     return getIconComponent(iconName || null);
   };
 
-  // Cart calculations
-  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // Cart calculations - base totals before deals
+  const cartSubtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Calculate applied deals
+  const { appliedDeals, cartTotal, totalSavings } = useMemo(() => {
+    if (deals.length === 0 || cart.length === 0) {
+      return { appliedDeals: [] as AppliedDeal[], cartTotal: cartSubtotal, totalSavings: 0 };
+    }
+
+    const appliedDeals: AppliedDeal[] = [];
+    let totalSavings = 0;
+
+    // Group cart items by category
+    const categoryQuantities: Record<string, { quantity: number; avgPrice: number; items: CartItem[] }> = {};
+    
+    cart.forEach(cartItem => {
+      const category = cartItem.category || 'uncategorized';
+      if (!categoryQuantities[category]) {
+        categoryQuantities[category] = { quantity: 0, avgPrice: 0, items: [] };
+      }
+      categoryQuantities[category].quantity += cartItem.quantity;
+      categoryQuantities[category].items.push(cartItem);
+    });
+
+    // Calculate average price per category for savings calculation
+    Object.keys(categoryQuantities).forEach(cat => {
+      const catData = categoryQuantities[cat];
+      const totalCatValue = catData.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      catData.avgPrice = totalCatValue / catData.quantity;
+    });
+
+    // Apply deals - check each deal to see if it applies
+    deals.forEach(deal => {
+      const category = deal.category || 'uncategorized';
+      const catData = categoryQuantities[category];
+      
+      if (catData && catData.quantity >= deal.quantity_required) {
+        // Calculate how many times this deal can be applied
+        const timesApplied = Math.floor(catData.quantity / deal.quantity_required);
+        
+        // Calculate savings: (regular price for qty) - (deal price)
+        const regularPriceForDealQty = catData.avgPrice * deal.quantity_required;
+        const savingsPerDeal = regularPriceForDealQty - deal.deal_price;
+        const totalDealSavings = savingsPerDeal * timesApplied;
+        
+        if (totalDealSavings > 0) {
+          appliedDeals.push({
+            deal,
+            timesApplied,
+            savings: totalDealSavings
+          });
+          totalSavings += totalDealSavings;
+        }
+      }
+    });
+
+    return {
+      appliedDeals,
+      cartTotal: cartSubtotal - totalSavings,
+      totalSavings
+    };
+  }, [cart, deals, cartSubtotal]);
 
   // Cart operations
   const addToCart = (item: EventItem) => {
@@ -246,9 +322,15 @@ export const EventRunner = ({
         } : i));
       }
       setOrderCount(prev => prev + 1);
+      
+      // Build toast message with savings info
+      const savingsMessage = totalSavings > 0 
+        ? ` • Saved $${totalSavings.toFixed(2)}` 
+        : '';
+      
       toast({
-        title: 'Sale Complete!',
-        description: `${cartItemCount} items • $${cartTotal.toFixed(2)}`
+        title: totalSavings > 0 ? '🎉 Sale Complete with Deals!' : 'Sale Complete!',
+        description: `${cartItemCount} items • $${cartTotal.toFixed(2)}${savingsMessage}`
       });
       clearCart();
       setMobileCartOpen(false);
@@ -321,7 +403,27 @@ export const EventRunner = ({
     loadDaySummaries();
     loadCategories();
     loadOrderCount();
+    loadDeals();
   }, [event.id]);
+
+  // Load event deals
+  const loadDeals = async () => {
+    const { data, error } = await supabase
+      .from('event_deals')
+      .select('*')
+      .eq('event_id', event.id);
+    
+    if (!error && data) {
+      setDeals(data.map(d => ({
+        id: d.id,
+        name: d.name,
+        description: d.description,
+        quantity_required: d.quantity_required,
+        category: d.category,
+        deal_price: Number(d.deal_price)
+      })));
+    }
+  };
 
   // Load order count from database (count distinct order_ids)
   const loadOrderCount = async () => {
@@ -746,8 +848,51 @@ export const EventRunner = ({
           </div>}
       </ScrollArea>
       
+      {/* Applied Deals Section */}
+      {appliedDeals.length > 0 && (
+        <div className="p-4 border-t bg-green-50 dark:bg-green-950/30">
+          <div className="flex items-center gap-2 mb-2">
+            <Tag className="w-4 h-4 text-green-600 dark:text-green-400" />
+            <span className="text-sm font-medium text-green-700 dark:text-green-400">Deals Applied!</span>
+          </div>
+          <div className="space-y-1">
+            {appliedDeals.map((applied, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="flex items-center justify-between text-sm"
+              >
+                <span className="text-green-700 dark:text-green-400">
+                  {applied.deal.name} {applied.timesApplied > 1 && `×${applied.timesApplied}`}
+                </span>
+                <span className="text-green-600 dark:text-green-400 font-medium">
+                  -${applied.savings.toFixed(2)}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+      
       {/* Cart Footer */}
       <div className="p-4 border-t space-y-4 bg-background">
+        {/* Subtotal and savings */}
+        {totalSavings > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>Subtotal</span>
+              <span className="line-through">${cartSubtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm text-green-600 dark:text-green-400">
+              <span className="flex items-center gap-1">
+                <Percent className="w-3 h-3" />
+                Bundle Savings
+              </span>
+              <span>-${totalSavings.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between text-lg font-bold">
           <span>Total</span>
           <span className="text-primary">${cartTotal.toFixed(2)}</span>
