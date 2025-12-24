@@ -1164,44 +1164,68 @@ export const EventRunner = ({
           <div className="flex gap-6 h-[calc(100vh-16rem)]">
             {/* Left Side - Item Tiles */}
             <div className="flex-1 flex flex-col min-h-0">
-              {/* Metrics Cards - Compact (Fixed) */}
-              <div className="grid grid-cols-5 gap-3 flex-shrink-0">
-                <div className="bg-card rounded-lg p-3 border">
-                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
-                    <DollarSign className="w-3.5 h-3.5" />
-                    <span className="text-xs">Revenue</span>
+              {/* Metrics Cards - Ultra Compact Row (Fixed) */}
+              <div className="flex gap-2 flex-shrink-0 flex-wrap">
+                <div className="bg-card rounded-lg px-3 py-2 border flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-primary" />
+                  <div>
+                    <span className="text-xs text-muted-foreground">Revenue</span>
+                    <p className="text-lg font-bold text-primary leading-none">${totalRevenue.toFixed(2)}</p>
                   </div>
-                  <p className="text-xl font-bold text-primary">${totalRevenue.toFixed(2)}</p>
                 </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
-                    <Package className="w-3.5 h-3.5" />
-                    <span className="text-xs">Items Sold</span>
+                <div className="bg-card rounded-lg px-3 py-2 border flex items-center gap-2">
+                  <Package className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <span className="text-xs text-muted-foreground">Sold</span>
+                    <p className="text-lg font-bold leading-none">{totalItemsSold}</p>
                   </div>
-                  <p className="text-xl font-bold">{totalItemsSold}</p>
                 </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
-                    <ShoppingCart className="w-3.5 h-3.5" />
-                    <span className="text-xs">Orders</span>
+                <div className="bg-card rounded-lg px-3 py-2 border flex items-center gap-2">
+                  <ShoppingCart className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <span className="text-xs text-muted-foreground">Orders</span>
+                    <p className="text-lg font-bold leading-none">{orderCount}</p>
                   </div>
-                  <p className="text-xl font-bold">{orderCount}</p>
                 </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span className="text-xs">Avg Order $</span>
+                <div className="bg-card rounded-lg px-3 py-2 border flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <span className="text-xs text-muted-foreground">Avg $</span>
+                    <p className="text-lg font-bold leading-none">${avgOrderSize.toFixed(2)}</p>
                   </div>
-                  <p className="text-xl font-bold">${avgOrderSize.toFixed(2)}</p>
-                </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
-                    <Package className="w-3.5 h-3.5" />
-                    <span className="text-xs">Items/Order</span>
-                  </div>
-                  <p className="text-xl font-bold">{itemsPerOrder.toFixed(1)}</p>
                 </div>
               </div>
+
+              {/* Available Deals Section */}
+              {deals.length > 0 && (
+                <div className="mt-3 flex-shrink-0">
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-lg p-3 border border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Tag className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-sm font-medium text-green-700 dark:text-green-400">Available Deals</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {deals.map(deal => {
+                        const CategoryIcon = getCategoryIcon(deal.category);
+                        return (
+                          <div
+                            key={deal.id}
+                            className="bg-white dark:bg-green-900/30 rounded-md px-3 py-1.5 border border-green-200 dark:border-green-700 flex items-center gap-2"
+                          >
+                            <CategoryIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            <div className="text-sm">
+                              <span className="font-medium text-green-700 dark:text-green-300">{deal.name}</span>
+                              <span className="text-green-600 dark:text-green-400 ml-1">
+                                ({deal.quantity_required} for ${deal.deal_price.toFixed(2)})
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Search and Filter Controls (Fixed) */}
               <div className="flex flex-col sm:flex-row gap-3 mt-4 flex-shrink-0">
