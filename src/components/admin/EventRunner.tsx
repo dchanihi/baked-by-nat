@@ -185,25 +185,33 @@ export const EventRunner = ({
 
     // Apply deals - check each deal to see if it applies
     deals.forEach(deal => {
+      // Skip deals without valid quantity requirement
+      if (!deal.quantity_required || deal.quantity_required < 2) return;
+      
       const category = deal.category || 'uncategorized';
       const catData = categoryQuantities[category];
       
+      // Only apply deal if we have enough items to meet the requirement
       if (catData && catData.quantity >= deal.quantity_required) {
         // Calculate how many times this deal can be applied
         const timesApplied = Math.floor(catData.quantity / deal.quantity_required);
         
-        // Calculate savings: (regular price for qty) - (deal price)
-        const regularPriceForDealQty = catData.avgPrice * deal.quantity_required;
-        const savingsPerDeal = regularPriceForDealQty - deal.deal_price;
-        const totalDealSavings = savingsPerDeal * timesApplied;
-        
-        if (totalDealSavings > 0) {
-          appliedDeals.push({
-            deal,
-            timesApplied,
-            savings: totalDealSavings
-          });
-          totalSavings += totalDealSavings;
+        // Only proceed if the deal can be applied at least once
+        if (timesApplied > 0) {
+          // Calculate savings: (regular price for qty) - (deal price)
+          const regularPriceForDealQty = catData.avgPrice * deal.quantity_required;
+          const savingsPerDeal = regularPriceForDealQty - deal.deal_price;
+          const totalDealSavings = savingsPerDeal * timesApplied;
+          
+          // Only add if there are actual savings
+          if (totalDealSavings > 0) {
+            appliedDeals.push({
+              deal,
+              timesApplied,
+              savings: totalDealSavings
+            });
+            totalSavings += totalDealSavings;
+          }
         }
       }
     });
