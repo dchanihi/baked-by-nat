@@ -1165,33 +1165,33 @@ export const EventRunner = ({
             {/* Left Side - Item Tiles */}
             <div className="flex-1 flex flex-col min-h-0">
               {/* Metrics and Deals Row (Fixed) */}
-              <div className="flex gap-2 flex-shrink-0 flex-wrap items-center">
-                <div className="bg-card rounded-lg px-3 py-2 border flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-primary" />
+              <div className="flex gap-3 flex-shrink-0 flex-wrap items-center">
+                <div className="bg-card rounded-xl px-4 py-3 border flex items-center gap-3">
+                  <DollarSign className="w-5 h-5 text-primary" />
                   <div>
                     <span className="text-xs text-muted-foreground">Revenue</span>
-                    <p className="text-lg font-bold text-primary leading-none">${totalRevenue.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-primary leading-none">${totalRevenue.toFixed(2)}</p>
                   </div>
                 </div>
-                <div className="bg-card rounded-lg px-3 py-2 border flex items-center gap-2">
-                  <Package className="w-4 h-4 text-muted-foreground" />
+                <div className="bg-card rounded-xl px-4 py-3 border flex items-center gap-3">
+                  <Package className="w-5 h-5 text-muted-foreground" />
                   <div>
                     <span className="text-xs text-muted-foreground">Sold</span>
-                    <p className="text-lg font-bold leading-none">{totalItemsSold}</p>
+                    <p className="text-xl font-bold leading-none">{totalItemsSold}</p>
                   </div>
                 </div>
-                <div className="bg-card rounded-lg px-3 py-2 border flex items-center gap-2">
-                  <ShoppingCart className="w-4 h-4 text-muted-foreground" />
+                <div className="bg-card rounded-xl px-4 py-3 border flex items-center gap-3">
+                  <ShoppingCart className="w-5 h-5 text-muted-foreground" />
                   <div>
                     <span className="text-xs text-muted-foreground">Orders</span>
-                    <p className="text-lg font-bold leading-none">{orderCount}</p>
+                    <p className="text-xl font-bold leading-none">{orderCount}</p>
                   </div>
                 </div>
-                <div className="bg-card rounded-lg px-3 py-2 border flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                <div className="bg-card rounded-xl px-4 py-3 border flex items-center gap-3">
+                  <TrendingUp className="w-5 h-5 text-muted-foreground" />
                   <div>
                     <span className="text-xs text-muted-foreground">Avg $</span>
-                    <p className="text-lg font-bold leading-none">${avgOrderSize.toFixed(2)}</p>
+                    <p className="text-xl font-bold leading-none">${avgOrderSize.toFixed(2)}</p>
                   </div>
                 </div>
 
