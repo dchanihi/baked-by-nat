@@ -102,6 +102,9 @@ export const EventRunner = ({
 
   // Deals state
   const [deals, setDeals] = useState<EventDeal[]>([]);
+  
+  // Event schedules state (to know total planned days)
+  const [totalPlannedDays, setTotalPlannedDays] = useState<number>(1);
 
   // Add new item state
   const [showAddItem, setShowAddItem] = useState(false);
@@ -486,7 +489,20 @@ export const EventRunner = ({
     loadCategories();
     loadOrderCount();
     loadDeals();
+    loadEventSchedules();
   }, [event.id]);
+
+  // Load event schedules to determine total planned days
+  const loadEventSchedules = async () => {
+    const { data, error } = await supabase
+      .from('event_schedules')
+      .select('*')
+      .eq('event_id', event.id);
+    
+    if (!error && data) {
+      setTotalPlannedDays(data.length > 0 ? data.length : 1);
+    }
+  };
 
   // Load event deals
   const loadDeals = async () => {
@@ -1200,10 +1216,13 @@ export const EventRunner = ({
           {onEdit && <Button onClick={onEdit} variant="ghost" size="icon" className="h-9 w-9">
               <Edit2 className="w-4 h-4" />
             </Button>}
-          <Button onClick={() => setShowEndDayDialog(true)} variant="outline">
-            <Clock className="w-4 h-4 mr-2" />
-            End Day {currentDay}
-          </Button>
+          {/* Only show End Day button if there are more days to run */}
+          {currentDay < totalPlannedDays && (
+            <Button onClick={() => setShowEndDayDialog(true)} variant="outline">
+              <Clock className="w-4 h-4 mr-2" />
+              End Day {currentDay}
+            </Button>
+          )}
           <Button onClick={() => setShowCompleteDialog(true)} variant="outline" className="text-green-600 hover:text-green-700">
             <CheckCircle className="w-4 h-4 mr-2" />
             Complete Event
