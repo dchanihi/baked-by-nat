@@ -65,7 +65,7 @@ const Index = () => {
             
             <div className="order-1 md:order-2">
               <div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-pink-soft/20">
-                <img src={heroImage} alt="Cozy baking scene with cute pastries" className="w-full h-full object-cover aspect-video" />
+                <img src={heroImage} alt="Cozy baking scene with cute pastries" className="w-full h-full object-cover aspect-[4/3]" />
               </div>
             </div>
           </div>
