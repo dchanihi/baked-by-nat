@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, DollarSign, Package, TrendingUp, Calendar, MapPin, Clock, BarChart3, Receipt, Hash } from 'lucide-react';
+import { ArrowLeft, DollarSign, Package, TrendingUp, Calendar, MapPin, Clock, BarChart3, Receipt, Hash, Wallet, Plus, Trash2, MinusCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getIconComponent } from '@/lib/categoryIcons';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface EventItem {
@@ -59,6 +61,17 @@ interface EventSale {
   item_category?: string;
 }
 
+interface EventExpense {
+  id: string;
+  event_id: string;
+  name: string;
+  amount: number;
+  category: string | null;
+  notes: string | null;
+  expense_date: string | null;
+  created_at: string;
+}
+
 interface EventStatisticsProps {
   event: Event;
   onBack: () => void;
@@ -72,6 +85,11 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
   const [sales, setSales] = useState<EventSale[]>([]);
   const [categoryIconMap, setCategoryIconMap] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('overview');
+  const [expenses, setExpenses] = useState<EventExpense[]>([]);
+  const [newExpenseName, setNewExpenseName] = useState('');
+  const [newExpenseAmount, setNewExpenseAmount] = useState('');
+  const [newExpenseCategory, setNewExpenseCategory] = useState('');
+  const [addingExpense, setAddingExpense] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -85,8 +103,60 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
       loadSchedules(),
       loadCategories(),
       loadSales(),
+      loadExpenses(),
     ]);
     setLoading(false);
+  };
+
+  const loadExpenses = async () => {
+    const { data } = await supabase
+      .from('event_expenses')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('created_at', { ascending: false });
+    if (data) setExpenses(data);
+  };
+
+  const addExpense = async () => {
+    if (!newExpenseName.trim() || !newExpenseAmount) {
+      toast.error('Please enter expense name and amount');
+      return;
+    }
+    
+    setAddingExpense(true);
+    const { error } = await supabase
+      .from('event_expenses')
+      .insert({
+        event_id: event.id,
+        name: newExpenseName.trim(),
+        amount: parseFloat(newExpenseAmount),
+        category: newExpenseCategory.trim() || null,
+      });
+    
+    if (error) {
+      toast.error('Failed to add expense');
+    } else {
+      toast.success('Expense added');
+      setNewExpenseName('');
+      setNewExpenseAmount('');
+      setNewExpenseCategory('');
+      loadExpenses();
+    }
+    setAddingExpense(false);
+  };
+
+  const deleteExpense = async (id: string) => {
+    const { error } = await supabase
+      .from('event_expenses')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      toast.error('Failed to delete expense');
+    } else {
+      toast.success('Expense deleted');
+      loadExpenses();
+    }
   };
 
   const loadItems = async () => {
@@ -170,11 +240,16 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
   const totalItemsSold = useMemo(() => {
     return sales.reduce((sum, s) => sum + s.quantity, 0);
   }, [sales]);
+  const totalExpenses = useMemo(() => {
+    return expenses.reduce((sum, e) => sum + e.amount, 0);
+  }, [expenses]);
   const totalDays = daySummaries.length;
   const totalInventory = items.reduce((sum, item) => sum + item.starting_quantity, 0);
   const totalCogs = items.reduce((sum, item) => sum + (item.cogs * item.quantity_sold), 0);
   const grossProfit = totalRevenue - totalCogs;
+  const netProfit = totalRevenue - totalCogs - totalExpenses;
   const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+  const netProfitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
   const avgRevenuePerDay = totalDays > 0 ? totalRevenue / totalDays : 0;
 
   // Get unique categories from items
@@ -295,6 +370,7 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
           <TabsTrigger value="daily">Daily Breakdown</TabsTrigger>
           <TabsTrigger value="items">Item Performance</TabsTrigger>
           <TabsTrigger value="orders">Order History</TabsTrigger>
+          <TabsTrigger value="expenses">Expenses</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -334,6 +410,29 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
               </div>
               <p className="text-2xl font-bold">{totalDays} days</p>
               <p className="text-xs text-muted-foreground">${avgRevenuePerDay.toFixed(2)}/day avg</p>
+            </div>
+          </div>
+
+          {/* Expenses & Net Profit */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-card rounded-xl border p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                <MinusCircle className="w-4 h-4" />
+                <span className="text-sm">Total Expenses</span>
+              </div>
+              <p className="text-2xl font-bold text-red-500">${totalExpenses.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">{expenses.length} expense{expenses.length !== 1 ? 's' : ''} recorded</p>
+            </div>
+
+            <div className="bg-card rounded-xl border p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                <Wallet className="w-4 h-4" />
+                <span className="text-sm">Net Profit</span>
+              </div>
+              <p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                ${netProfit.toFixed(2)}
+              </p>
+              <p className="text-xs text-muted-foreground">{netProfitMargin.toFixed(1)}% net margin</p>
             </div>
           </div>
 
@@ -872,6 +971,127 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
                 </div>
               )}
             </>
+          )}
+        </TabsContent>
+
+        {/* Expenses Tab */}
+        <TabsContent value="expenses" className="space-y-4">
+          {/* Add Expense Form */}
+          <div className="bg-card rounded-xl border p-4">
+            <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-primary" />
+              Add Expense
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <Input
+                placeholder="Expense name"
+                value={newExpenseName}
+                onChange={(e) => setNewExpenseName(e.target.value)}
+              />
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Amount"
+                value={newExpenseAmount}
+                onChange={(e) => setNewExpenseAmount(e.target.value)}
+              />
+              <Input
+                placeholder="Category (optional)"
+                value={newExpenseCategory}
+                onChange={(e) => setNewExpenseCategory(e.target.value)}
+              />
+              <Button onClick={addExpense} disabled={addingExpense}>
+                <Plus className="w-4 h-4 mr-1" />
+                {addingExpense ? 'Adding...' : 'Add Expense'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Expense Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-card rounded-xl border p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                <MinusCircle className="w-4 h-4" />
+                <span className="text-sm">Total Expenses</span>
+              </div>
+              <p className="text-2xl font-bold text-red-500">${totalExpenses.toFixed(2)}</p>
+            </div>
+            <div className="bg-card rounded-xl border p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                <Receipt className="w-4 h-4" />
+                <span className="text-sm">Expense Count</span>
+              </div>
+              <p className="text-2xl font-bold">{expenses.length}</p>
+            </div>
+            <div className="bg-card rounded-xl border p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                <DollarSign className="w-4 h-4" />
+                <span className="text-sm">Gross Profit</span>
+              </div>
+              <p className="text-2xl font-bold text-blue-600">${grossProfit.toFixed(2)}</p>
+            </div>
+            <div className="bg-card rounded-xl border p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                <Wallet className="w-4 h-4" />
+                <span className="text-sm">Net Profit</span>
+              </div>
+              <p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                ${netProfit.toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          {/* Expenses List */}
+          {expenses.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <MinusCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No expenses recorded for this event.</p>
+              <p className="text-sm mt-1">Add expenses above to track costs.</p>
+            </div>
+          ) : (
+            <div className="bg-card rounded-xl border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-secondary">
+                  <tr>
+                    <th className="text-left p-3 font-medium">Expense</th>
+                    <th className="text-left p-3 font-medium">Category</th>
+                    <th className="text-left p-3 font-medium">Date</th>
+                    <th className="text-right p-3 font-medium">Amount</th>
+                    <th className="text-right p-3 font-medium w-16"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses.map((expense) => (
+                    <tr key={expense.id} className="border-t hover:bg-secondary/50 transition-colors">
+                      <td className="p-3 font-medium">{expense.name}</td>
+                      <td className="p-3 text-muted-foreground">{expense.category || '-'}</td>
+                      <td className="p-3 text-muted-foreground">
+                        {expense.expense_date ? format(new Date(expense.expense_date), 'MMM d, yyyy') : format(new Date(expense.created_at), 'MMM d, yyyy')}
+                      </td>
+                      <td className="p-3 text-right font-medium text-red-500">${expense.amount.toFixed(2)}</td>
+                      <td className="p-3 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                          onClick={() => deleteExpense(expense.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-secondary/50 font-medium">
+                  <tr>
+                    <td className="p-3" colSpan={3}>Total</td>
+                    <td className="p-3 text-right text-red-500">${totalExpenses.toFixed(2)}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           )}
         </TabsContent>
       </Tabs>

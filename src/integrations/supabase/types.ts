@@ -177,6 +177,50 @@ export type Database = {
           },
         ]
       }
+      event_expenses: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string
+          event_id: string
+          expense_date: string | null
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          event_id: string
+          expense_date?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          event_id?: string
+          expense_date?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_expenses_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_items: {
         Row: {
           bake_id: string | null
