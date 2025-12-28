@@ -14,6 +14,7 @@ import { EventsList } from '@/components/admin/EventsList';
 import { ArchivedEventsList } from '@/components/admin/ArchivedEventsList';
 import { EventEditor } from '@/components/admin/EventEditor';
 import { EventRunner } from '@/components/admin/EventRunner';
+import { EventStatistics } from '@/components/admin/EventStatistics';
 import Navigation from '@/components/Navigation';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -42,6 +43,7 @@ const Admin = () => {
   const [editingBake, setEditingBake] = useState<Bake | null>(null);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [runningEvent, setRunningEvent] = useState<Event | null>(null);
+  const [viewingEventStats, setViewingEventStats] = useState<Event | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [viewingArchive, setViewingArchive] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -274,6 +276,14 @@ const Admin = () => {
     setRunningEvent(event);
   };
 
+  const handleViewEventStats = (event: Event) => {
+    setViewingEventStats(event);
+  };
+
+  const handleBackFromEventStats = () => {
+    setViewingEventStats(null);
+  };
+
   const handleEventSaveComplete = () => {
     setIsCreatingEvent(false);
     setEditingEvent(null);
@@ -314,6 +324,11 @@ const Admin = () => {
             order={viewingOrder}
             onBack={handleBackFromOrder}
             onUpdate={handleOrderUpdate}
+          />
+        ) : viewingEventStats ? (
+          <EventStatistics
+            event={viewingEventStats}
+            onBack={handleBackFromEventStats}
           />
         ) : runningEvent ? (
           <EventRunner
@@ -382,6 +397,7 @@ const Admin = () => {
                 onEdit={handleEditEvent}
                 onArchive={handleArchiveEvent}
                 onRun={handleRunEvent}
+                onViewStats={handleViewEventStats}
                 onCreate={handleCreateEvent}
                 onViewArchive={() => setViewingArchive(true)}
               />

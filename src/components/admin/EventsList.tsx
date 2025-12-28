@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format, isSameDay } from 'date-fns';
-import { Calendar, MapPin, Play, Edit, Archive, Plus, Clock } from 'lucide-react';
+import { Calendar, MapPin, Play, Edit, Archive, Plus, Clock, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,11 +43,12 @@ interface EventsListProps {
   onEdit: (event: Event) => void;
   onArchive: (id: string) => void;
   onRun: (event: Event) => void;
+  onViewStats: (event: Event) => void;
   onCreate: () => void;
   onViewArchive: () => void;
 }
 
-export const EventsList = ({ events, onEdit, onArchive, onRun, onCreate, onViewArchive }: EventsListProps) => {
+export const EventsList = ({ events, onEdit, onArchive, onRun, onViewStats, onCreate, onViewArchive }: EventsListProps) => {
   const [schedules, setSchedules] = useState<Record<string, ScheduleDay[]>>({});
   
   // Filter out archived events
@@ -222,7 +223,16 @@ export const EventsList = ({ events, onEdit, onArchive, onRun, onCreate, onViewA
                     <TableCell>{getStatusBadge(event.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {event.status !== 'completed' && (
+                        {event.status === 'completed' ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onViewStats(event)}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <BarChart3 className="w-4 h-4" />
+                          </Button>
+                        ) : (
                           <Button
                             size="sm"
                             variant="outline"
