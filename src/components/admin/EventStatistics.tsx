@@ -435,43 +435,47 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
 
         {/* Daily Breakdown Tab */}
         <TabsContent value="daily" className="space-y-4">
-          {daySummaries.length === 0 ? (
+          {ordersByDay.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <p>No daily summaries available.</p>
+              <p>No daily data available.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {daySummaries.map((day) => {
-                const schedule = schedules.find(s => s.day_number === day.day_number);
-                const dayDuration = day.close_time
-                  ? Math.round((new Date(day.close_time).getTime() - new Date(day.open_time).getTime()) / (1000 * 60 * 60))
+              {ordersByDay.map((dayData) => {
+                const daySummary = daySummaries.find(d => d.day_number === dayData.dayNumber);
+                const dayDuration = daySummary?.close_time && daySummary?.open_time
+                  ? Math.round((new Date(daySummary.close_time).getTime() - new Date(daySummary.open_time).getTime()) / (1000 * 60 * 60))
                   : 0;
-                const revenuePercent = totalRevenue > 0 ? (day.revenue / totalRevenue) * 100 : 0;
+                const revenuePercent = totalRevenue > 0 ? (dayData.revenue / totalRevenue) * 100 : 0;
 
                 return (
-                  <div key={day.id} className="bg-card rounded-xl border p-4">
+                  <div key={dayData.dayNumber} className="bg-card rounded-xl border p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-sm font-bold text-primary">{day.day_number}</span>
+                          <span className="text-sm font-bold text-primary">{dayData.dayNumber}</span>
                         </div>
                         <div>
-                          <p className="font-medium">Day {day.day_number}</p>
+                          <p className="font-medium">Day {dayData.dayNumber}</p>
                           <p className="text-xs text-muted-foreground">
-                            {schedule && format(new Date(schedule.date), 'EEEE, MMM d, yyyy')}
+                            {format(new Date(dayData.date), 'EEEE, MMM d, yyyy')}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-bold text-green-600">${day.revenue.toFixed(2)}</p>
+                        <p className="text-xl font-bold text-green-600">${dayData.revenue.toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">{revenuePercent.toFixed(1)}% of total</p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 mt-4 pt-3 border-t">
+                    <div className="grid grid-cols-4 gap-4 mt-4 pt-3 border-t">
                       <div className="text-center">
-                        <p className="text-lg font-semibold">{day.items_sold}</p>
+                        <p className="text-lg font-semibold">{dayData.itemCount}</p>
                         <p className="text-xs text-muted-foreground">Items Sold</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-semibold">{dayData.orders.length}</p>
+                        <p className="text-xs text-muted-foreground">Orders</p>
                       </div>
                       <div className="text-center">
                         <p className="text-lg font-semibold">{dayDuration}h</p>
@@ -479,18 +483,20 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
                       </div>
                       <div className="text-center">
                         <p className="text-lg font-semibold">
-                          ${day.items_sold > 0 ? (day.revenue / day.items_sold).toFixed(2) : '0.00'}
+                          ${dayData.orders.length > 0 ? (dayData.revenue / dayData.orders.length).toFixed(2) : '0.00'}
                         </p>
-                        <p className="text-xs text-muted-foreground">Avg Sale</p>
+                        <p className="text-xs text-muted-foreground">Avg Order</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
-                      <span>
-                        {format(new Date(day.open_time), 'h:mm a')} – {day.close_time ? format(new Date(day.close_time), 'h:mm a') : '-'}
-                      </span>
-                    </div>
+                    {daySummary && (
+                      <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        <span>
+                          {format(new Date(daySummary.open_time), 'h:mm a')} – {daySummary.close_time ? format(new Date(daySummary.close_time), 'h:mm a') : '-'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
