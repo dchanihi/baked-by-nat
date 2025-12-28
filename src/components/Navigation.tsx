@@ -1,8 +1,9 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Heart, Settings, LogOut } from 'lucide-react';
+import { Settings, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import logo from '@/assets/logo.ico';
 
 const Navigation = () => {
   const location = useLocation();
@@ -38,7 +39,7 @@ const Navigation = () => {
             to="/" 
             className="flex items-center gap-2 text-xl font-display font-semibold text-primary-foreground hover:text-pink-accent transition-colors"
           >
-            <Heart className="w-5 h-5 fill-pink-soft" />
+            <img src={logo} alt="baked by nat logo" className="w-6 h-6" />
             baked by nat
           </Link>
           
