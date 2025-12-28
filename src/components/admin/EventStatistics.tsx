@@ -163,9 +163,13 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
     return getIconComponent(iconName || null);
   };
 
-  // Calculate totals from day summaries
-  const totalRevenue = daySummaries.reduce((sum, d) => sum + d.revenue, 0);
-  const totalItemsSold = daySummaries.reduce((sum, d) => sum + d.items_sold, 0);
+  // Calculate totals from actual sales (aligns with Order History)
+  const totalRevenue = useMemo(() => {
+    return sales.reduce((sum, s) => sum + s.total_price, 0);
+  }, [sales]);
+  const totalItemsSold = useMemo(() => {
+    return sales.reduce((sum, s) => sum + s.quantity, 0);
+  }, [sales]);
   const totalDays = daySummaries.length;
   const totalInventory = items.reduce((sum, item) => sum + item.starting_quantity, 0);
   const totalCogs = items.reduce((sum, item) => sum + (item.cogs * item.quantity_sold), 0);
