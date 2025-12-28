@@ -39,7 +39,7 @@ const Navigation = () => {
             to="/" 
             className="flex items-center gap-2 text-xl font-display font-semibold text-primary-foreground hover:text-pink-accent transition-colors"
           >
-            <img src={logo} alt="baked by nat logo" className="w-6 h-6" />
+            <img src={logo} alt="baked by nat logo" className="w-8 h-8 transition-transform duration-300 hover:scale-110 hover:rotate-3" />
             baked by nat
           </Link>
           
