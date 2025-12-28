@@ -375,7 +375,7 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          {/* Key Metrics */}
+          {/* Key Metrics - Main Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-card rounded-xl border p-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-2">
@@ -383,15 +383,7 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
                 <span className="text-sm">Total Revenue</span>
               </div>
               <p className="text-2xl font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
-            </div>
-
-            <div className="bg-card rounded-xl border p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                <Package className="w-4 h-4" />
-                <span className="text-sm">Items Sold</span>
-              </div>
-              <p className="text-2xl font-bold">{totalItemsSold}</p>
-              <p className="text-xs text-muted-foreground">of {totalInventory} ({totalInventory > 0 ? Math.round(totalItemsSold / totalInventory * 100) : 0}%)</p>
+              <p className="text-xs text-muted-foreground">${avgRevenuePerDay.toFixed(2)}/day avg</p>
             </div>
 
             <div className="bg-card rounded-xl border p-4">
@@ -403,18 +395,6 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
               <p className="text-xs text-muted-foreground">{profitMargin.toFixed(1)}% margin</p>
             </div>
 
-            <div className="bg-card rounded-xl border p-4">
-              <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                <Calendar className="w-4 h-4" />
-                <span className="text-sm">Event Duration</span>
-              </div>
-              <p className="text-2xl font-bold">{totalDays} days</p>
-              <p className="text-xs text-muted-foreground">${avgRevenuePerDay.toFixed(2)}/day avg</p>
-            </div>
-          </div>
-
-          {/* Expenses & Net Profit */}
-          <div className="grid grid-cols-2 gap-4">
             <div className="bg-card rounded-xl border p-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-2">
                 <MinusCircle className="w-4 h-4" />
@@ -433,6 +413,25 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
                 ${netProfit.toFixed(2)}
               </p>
               <p className="text-xs text-muted-foreground">{netProfitMargin.toFixed(1)}% net margin</p>
+            </div>
+          </div>
+
+          {/* Secondary Metrics - Smaller Row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-card rounded-lg border p-3">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <Package className="w-3 h-3" />
+                <span className="text-xs">Items Sold</span>
+              </div>
+              <p className="text-lg font-semibold">{totalItemsSold} <span className="text-xs font-normal text-muted-foreground">of {totalInventory} ({totalInventory > 0 ? Math.round(totalItemsSold / totalInventory * 100) : 0}%)</span></p>
+            </div>
+
+            <div className="bg-card rounded-lg border p-3">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <Calendar className="w-3 h-3" />
+                <span className="text-xs">Event Duration</span>
+              </div>
+              <p className="text-lg font-semibold">{totalDays} day{totalDays !== 1 ? 's' : ''}</p>
             </div>
           </div>
 
