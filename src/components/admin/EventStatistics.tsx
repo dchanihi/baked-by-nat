@@ -203,6 +203,32 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [sales]);
 
+  // Group orders by day based on day summaries open/close times
+  const ordersByDay = useMemo(() => {
+    const dayOrders: { dayNumber: number; date: string; orders: typeof orderHistory; revenue: number; itemCount: number }[] = [];
+    
+    daySummaries.forEach((day) => {
+      const schedule = schedules.find(s => s.day_number === day.day_number);
+      const dayOpenTime = new Date(day.open_time).getTime();
+      const dayCloseTime = day.close_time ? new Date(day.close_time).getTime() : dayOpenTime + (24 * 60 * 60 * 1000);
+      
+      const ordersForDay = orderHistory.filter(order => {
+        const orderTime = new Date(order.timestamp).getTime();
+        return orderTime >= dayOpenTime && orderTime <= dayCloseTime;
+      });
+      
+      dayOrders.push({
+        dayNumber: day.day_number,
+        date: schedule?.date || format(new Date(day.open_time), 'yyyy-MM-dd'),
+        orders: ordersForDay,
+        revenue: ordersForDay.reduce((sum, o) => sum + o.total, 0),
+        itemCount: ordersForDay.reduce((sum, o) => sum + o.itemCount, 0),
+      });
+    });
+    
+    return dayOrders;
+  }, [orderHistory, daySummaries, schedules]);
+
   // Chart data for item performance
   const itemChartData = useMemo(() => {
     return items
@@ -216,6 +242,8 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
       .sort((a, b) => b.sold - a.sold)
       .slice(0, 10); // Top 10 items
   }, [items]);
+
+  const [ordersViewMode, setOrdersViewMode] = useState<'all' | 'by-day'>('by-day');
 
   if (loading) {
     return (
@@ -632,61 +660,207 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-                <span>{orderHistory.length} orders</span>
-                <span>Total: ${orderHistory.reduce((sum, o) => sum + o.total, 0).toFixed(2)}</span>
-              </div>
-              <div className="space-y-3">
-                {orderHistory.map((order, index) => (
-                  <motion.div
-                    key={order.orderId}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.03 }}
-                    className="bg-card rounded-xl border p-4"
+              {/* View Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={ordersViewMode === 'by-day' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setOrdersViewMode('by-day')}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Hash className="w-4 h-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">Order #{order.orderId.substring(0, 8)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(order.timestamp), 'MMM d, yyyy h:mm a')}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-green-600">${order.total.toFixed(2)}</p>
-                        <p className="text-xs text-muted-foreground">{order.itemCount} items</p>
-                      </div>
-                    </div>
-
-                    <div className="border-t pt-3 space-y-2">
-                      {order.sales.map((sale) => {
-                        const CategoryIcon = getCategoryIcon(sale.item_category || null);
-                        return (
-                          <div key={sale.id} className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-2">
-                              <div className="w-5 h-5 rounded bg-secondary flex items-center justify-center">
-                                <CategoryIcon className="w-3 h-3 text-muted-foreground" />
-                              </div>
-                              <span>{sale.item_name || 'Unknown Item'}</span>
-                              {sale.quantity > 1 && (
-                                <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                                  ×{sale.quantity}
-                                </Badge>
-                              )}
-                            </div>
-                            <span className="font-medium">${sale.total_price.toFixed(2)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                ))}
+                    <Calendar className="w-4 h-4 mr-1" />
+                    By Day
+                  </Button>
+                  <Button
+                    variant={ordersViewMode === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setOrdersViewMode('all')}
+                  >
+                    <Receipt className="w-4 h-4 mr-1" />
+                    All Orders
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {orderHistory.length} orders · ${orderHistory.reduce((sum, o) => sum + o.total, 0).toFixed(2)} total
+                </div>
               </div>
+
+              {/* Event Totals Summary */}
+              <div className="bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-xl border p-4">
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-green-600" />
+                  Event Totals
+                </h4>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-green-600">${orderHistory.reduce((sum, o) => sum + o.total, 0).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">Total Revenue</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">{orderHistory.length}</p>
+                    <p className="text-xs text-muted-foreground">Total Orders</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">{orderHistory.reduce((sum, o) => sum + o.itemCount, 0)}</p>
+                    <p className="text-xs text-muted-foreground">Total Items</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">
+                      ${orderHistory.length > 0 ? (orderHistory.reduce((sum, o) => sum + o.total, 0) / orderHistory.length).toFixed(2) : '0.00'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Avg Order</p>
+                  </div>
+                </div>
+              </div>
+
+              {ordersViewMode === 'by-day' ? (
+                /* Day-by-Day View */
+                <div className="space-y-6">
+                  {ordersByDay.map((dayData) => (
+                    <div key={dayData.dayNumber} className="space-y-3">
+                      {/* Day Header with Metrics */}
+                      <div className="bg-card rounded-xl border p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <span className="text-sm font-bold text-primary">{dayData.dayNumber}</span>
+                            </div>
+                            <div>
+                              <p className="font-medium">Day {dayData.dayNumber}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(dayData.date), 'EEEE, MMM d, yyyy')}
+                              </p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-green-600 border-green-600">
+                            {dayData.orders.length} orders
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-4 gap-4 pt-3 border-t">
+                          <div className="text-center">
+                            <p className="text-lg font-bold text-green-600">${dayData.revenue.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">Revenue</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-lg font-bold">{dayData.orders.length}</p>
+                            <p className="text-xs text-muted-foreground">Orders</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-lg font-bold">{dayData.itemCount}</p>
+                            <p className="text-xs text-muted-foreground">Items</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-lg font-bold">
+                              ${dayData.orders.length > 0 ? (dayData.revenue / dayData.orders.length).toFixed(2) : '0.00'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Avg Order</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Day Orders */}
+                      {dayData.orders.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground text-sm bg-card rounded-xl border">
+                          No orders on this day
+                        </div>
+                      ) : (
+                        <div className="space-y-2 pl-4 border-l-2 border-primary/20 ml-5">
+                          {dayData.orders.map((order, index) => (
+                            <motion.div
+                              key={order.orderId}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: index * 0.02 }}
+                              className="bg-card rounded-lg border p-3"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span className="font-medium text-sm">#{order.orderId.substring(0, 8)}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {format(new Date(order.timestamp), 'h:mm a')}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">{order.itemCount} items</span>
+                                  <span className="font-bold text-green-600">${order.total.toFixed(2)}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap gap-1.5">
+                                {order.sales.map((sale) => {
+                                  const CategoryIcon = getCategoryIcon(sale.item_category || null);
+                                  return (
+                                    <div key={sale.id} className="flex items-center gap-1 bg-secondary rounded px-2 py-0.5 text-xs">
+                                      <CategoryIcon className="w-3 h-3 text-muted-foreground" />
+                                      <span>{sale.item_name}</span>
+                                      {sale.quantity > 1 && <span className="text-muted-foreground">×{sale.quantity}</span>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* All Orders View */
+                <div className="space-y-3">
+                  {orderHistory.map((order, index) => (
+                    <motion.div
+                      key={order.orderId}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className="bg-card rounded-xl border p-4"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Hash className="w-4 h-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">Order #{order.orderId.substring(0, 8)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(order.timestamp), 'MMM d, yyyy h:mm a')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-green-600">${order.total.toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">{order.itemCount} items</p>
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-3 space-y-2">
+                        {order.sales.map((sale) => {
+                          const CategoryIcon = getCategoryIcon(sale.item_category || null);
+                          return (
+                            <div key={sale.id} className="flex items-center justify-between text-sm">
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded bg-secondary flex items-center justify-center">
+                                  <CategoryIcon className="w-3 h-3 text-muted-foreground" />
+                                </div>
+                                <span>{sale.item_name || 'Unknown Item'}</span>
+                                {sale.quantity > 1 && (
+                                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                                    ×{sale.quantity}
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="font-medium">${sale.total_price.toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </TabsContent>
