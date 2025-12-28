@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, DollarSign, Package, TrendingUp, Calendar, MapPin, Clock, BarChart3 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Package, TrendingUp, Calendar, MapPin, Clock, BarChart3, Receipt, Hash } from 'lucide-react';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getIconComponent } from '@/lib/categoryIcons';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface EventItem {
   id: string;
@@ -46,6 +47,18 @@ interface ScheduleDay {
   end_time: string | null;
 }
 
+interface EventSale {
+  id: string;
+  order_id: string | null;
+  event_item_id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  created_at: string;
+  item_name?: string;
+  item_category?: string;
+}
+
 interface EventStatisticsProps {
   event: Event;
   onBack: () => void;
@@ -56,6 +69,7 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
   const [loading, setLoading] = useState(true);
   const [daySummaries, setDaySummaries] = useState<DaySummary[]>([]);
   const [schedules, setSchedules] = useState<ScheduleDay[]>([]);
+  const [sales, setSales] = useState<EventSale[]>([]);
   const [categoryIconMap, setCategoryIconMap] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -70,6 +84,7 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
       loadDaySummaries(),
       loadSchedules(),
       loadCategories(),
+      loadSales(),
     ]);
     setLoading(false);
   };
@@ -114,6 +129,34 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
     }
   };
 
+  const loadSales = async () => {
+    // First get item IDs for this event
+    const { data: eventItems } = await supabase
+      .from('event_items')
+      .select('id, name, category')
+      .eq('event_id', event.id);
+
+    if (!eventItems || eventItems.length === 0) return;
+
+    const itemIds = eventItems.map(i => i.id);
+    const itemMap = new Map(eventItems.map(i => [i.id, { name: i.name, category: i.category }]));
+
+    const { data: salesData } = await supabase
+      .from('event_sales')
+      .select('*')
+      .in('event_item_id', itemIds)
+      .order('created_at', { ascending: false });
+
+    if (salesData) {
+      const enrichedSales = salesData.map(sale => ({
+        ...sale,
+        item_name: itemMap.get(sale.event_item_id)?.name,
+        item_category: itemMap.get(sale.event_item_id)?.category,
+      }));
+      setSales(enrichedSales);
+    }
+  };
+
   const getCategoryIcon = (categoryName: string | null) => {
     if (!categoryName) return getIconComponent(null);
     const iconName = categoryIconMap[categoryName];
@@ -137,6 +180,41 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
       if (item.category) cats.add(item.category);
     });
     return Array.from(cats).sort();
+  }, [items]);
+
+  // Group sales by order_id for order history
+  const orderHistory = useMemo(() => {
+    const orderMap = new Map<string, EventSale[]>();
+    sales.forEach(sale => {
+      const orderId = sale.order_id || sale.id; // Use sale id as fallback for ungrouped sales
+      if (!orderMap.has(orderId)) {
+        orderMap.set(orderId, []);
+      }
+      orderMap.get(orderId)!.push(sale);
+    });
+    return Array.from(orderMap.entries())
+      .map(([orderId, orderSales]) => ({
+        orderId,
+        sales: orderSales,
+        total: orderSales.reduce((sum, s) => sum + s.total_price, 0),
+        itemCount: orderSales.reduce((sum, s) => sum + s.quantity, 0),
+        timestamp: orderSales[0].created_at,
+      }))
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [sales]);
+
+  // Chart data for item performance
+  const itemChartData = useMemo(() => {
+    return items
+      .map(item => ({
+        name: item.name.length > 15 ? item.name.substring(0, 15) + '...' : item.name,
+        fullName: item.name,
+        sold: item.quantity_sold,
+        revenue: item.price * item.quantity_sold,
+        remaining: item.starting_quantity - item.quantity_sold,
+      }))
+      .sort((a, b) => b.sold - a.sold)
+      .slice(0, 10); // Top 10 items
   }, [items]);
 
   if (loading) {
@@ -184,6 +262,7 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="daily">Daily Breakdown</TabsTrigger>
           <TabsTrigger value="items">Item Performance</TabsTrigger>
+          <TabsTrigger value="orders">Order History</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -388,78 +467,227 @@ export const EventStatistics = ({ event, onBack }: EventStatisticsProps) => {
         </TabsContent>
 
         {/* Item Performance Tab */}
-        <TabsContent value="items" className="space-y-4">
+        <TabsContent value="items" className="space-y-6">
           {items.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <p>No items in this event.</p>
             </div>
           ) : (
-            <div className="bg-card rounded-xl border overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-secondary">
-                    <tr>
-                      <th className="text-left p-3 font-medium">Item</th>
-                      <th className="text-center p-3 font-medium">Sold</th>
-                      <th className="text-center p-3 font-medium">Remaining</th>
-                      <th className="text-right p-3 font-medium">Revenue</th>
-                      <th className="text-right p-3 font-medium">Profit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items
-                      .sort((a, b) => (b.price * b.quantity_sold) - (a.price * a.quantity_sold))
-                      .map((item) => {
-                        const revenue = item.price * item.quantity_sold;
-                        const profit = revenue - (item.cogs * item.quantity_sold);
-                        const remaining = item.starting_quantity - item.quantity_sold;
-                        const soldPercent = item.starting_quantity > 0
-                          ? (item.quantity_sold / item.starting_quantity) * 100
-                          : 0;
-                        const CategoryIcon = getCategoryIcon(item.category);
-
-                        return (
-                          <tr key={item.id} className="border-t hover:bg-secondary/50 transition-colors">
-                            <td className="p-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded bg-secondary flex items-center justify-center">
-                                  <CategoryIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                                </div>
-                                <div>
-                                  <p className="font-medium">{item.name}</p>
-                                  <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} each</p>
-                                </div>
+            <>
+              {/* Bar Chart */}
+              <div className="bg-card rounded-xl border p-4">
+                <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-primary" />
+                  Top Items by Quantity Sold
+                </h4>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={itemChartData} layout="vertical" margin={{ left: 20, right: 20, top: 10, bottom: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                      <XAxis type="number" tick={{ fontSize: 12 }} />
+                      <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={100} />
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-popover border rounded-lg p-2 shadow-md text-sm">
+                                <p className="font-medium">{data.fullName}</p>
+                                <p className="text-muted-foreground">Sold: <span className="text-foreground font-medium">{data.sold}</span></p>
+                                <p className="text-muted-foreground">Revenue: <span className="text-green-600 font-medium">${data.revenue.toFixed(2)}</span></p>
                               </div>
-                            </td>
-                            <td className="p-3 text-center">
-                              <span className="font-medium">{item.quantity_sold}</span>
-                              <span className="text-muted-foreground text-xs ml-1">({soldPercent.toFixed(0)}%)</span>
-                            </td>
-                            <td className="p-3 text-center">
-                              <span className={remaining === 0 ? 'text-green-600 font-medium' : ''}>{remaining}</span>
-                            </td>
-                            <td className="p-3 text-right font-medium">${revenue.toFixed(2)}</td>
-                            <td className="p-3 text-right">
-                              <span className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                ${profit.toFixed(2)}
-                              </span>
-                            </td>
-                          </tr>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar dataKey="sold" radius={[0, 4, 4, 0]}>
+                        {itemChartData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={`hsl(var(--pink-soft))`} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Revenue Bar Chart */}
+              <div className="bg-card rounded-xl border p-4">
+                <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-green-600" />
+                  Top Items by Revenue
+                </h4>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart 
+                      data={[...itemChartData].sort((a, b) => b.revenue - a.revenue)} 
+                      layout="vertical" 
+                      margin={{ left: 20, right: 20, top: 10, bottom: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                      <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(value) => `$${value}`} />
+                      <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={100} />
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-popover border rounded-lg p-2 shadow-md text-sm">
+                                <p className="font-medium">{data.fullName}</p>
+                                <p className="text-muted-foreground">Revenue: <span className="text-green-600 font-medium">${data.revenue.toFixed(2)}</span></p>
+                                <p className="text-muted-foreground">Sold: <span className="text-foreground font-medium">{data.sold}</span></p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>
+                        {itemChartData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill="#22c55e" />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Item Table */}
+              <div className="bg-card rounded-xl border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-secondary">
+                      <tr>
+                        <th className="text-left p-3 font-medium">Item</th>
+                        <th className="text-center p-3 font-medium">Sold</th>
+                        <th className="text-center p-3 font-medium">Remaining</th>
+                        <th className="text-right p-3 font-medium">Revenue</th>
+                        <th className="text-right p-3 font-medium">Profit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items
+                        .sort((a, b) => (b.price * b.quantity_sold) - (a.price * a.quantity_sold))
+                        .map((item) => {
+                          const revenue = item.price * item.quantity_sold;
+                          const profit = revenue - (item.cogs * item.quantity_sold);
+                          const remaining = item.starting_quantity - item.quantity_sold;
+                          const soldPercent = item.starting_quantity > 0
+                            ? (item.quantity_sold / item.starting_quantity) * 100
+                            : 0;
+                          const CategoryIcon = getCategoryIcon(item.category);
+
+                          return (
+                            <tr key={item.id} className="border-t hover:bg-secondary/50 transition-colors">
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded bg-secondary flex items-center justify-center">
+                                    <CategoryIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{item.name}</p>
+                                    <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} each</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className="font-medium">{item.quantity_sold}</span>
+                                <span className="text-muted-foreground text-xs ml-1">({soldPercent.toFixed(0)}%)</span>
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className={remaining === 0 ? 'text-green-600 font-medium' : ''}>{remaining}</span>
+                              </td>
+                              <td className="p-3 text-right font-medium">${revenue.toFixed(2)}</td>
+                              <td className="p-3 text-right">
+                                <span className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                  ${profit.toFixed(2)}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                    <tfoot className="bg-secondary/50 font-medium">
+                      <tr>
+                        <td className="p-3">Totals</td>
+                        <td className="p-3 text-center">{totalItemsSold}</td>
+                        <td className="p-3 text-center">{totalInventory - totalItemsSold}</td>
+                        <td className="p-3 text-right">${totalRevenue.toFixed(2)}</td>
+                        <td className="p-3 text-right text-green-600">${grossProfit.toFixed(2)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        {/* Order History Tab */}
+        <TabsContent value="orders" className="space-y-4">
+          {orderHistory.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Receipt className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No orders recorded for this event.</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+                <span>{orderHistory.length} orders</span>
+                <span>Total: ${orderHistory.reduce((sum, o) => sum + o.total, 0).toFixed(2)}</span>
+              </div>
+              <div className="space-y-3">
+                {orderHistory.map((order, index) => (
+                  <motion.div
+                    key={order.orderId}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="bg-card rounded-xl border p-4"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Hash className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">Order #{order.orderId.substring(0, 8)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(order.timestamp), 'MMM d, yyyy h:mm a')}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-green-600">${order.total.toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">{order.itemCount} items</p>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-3 space-y-2">
+                      {order.sales.map((sale) => {
+                        const CategoryIcon = getCategoryIcon(sale.item_category || null);
+                        return (
+                          <div key={sale.id} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded bg-secondary flex items-center justify-center">
+                                <CategoryIcon className="w-3 h-3 text-muted-foreground" />
+                              </div>
+                              <span>{sale.item_name || 'Unknown Item'}</span>
+                              {sale.quantity > 1 && (
+                                <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                                  ×{sale.quantity}
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="font-medium">${sale.total_price.toFixed(2)}</span>
+                          </div>
                         );
                       })}
-                  </tbody>
-                  <tfoot className="bg-secondary/50 font-medium">
-                    <tr>
-                      <td className="p-3">Totals</td>
-                      <td className="p-3 text-center">{totalItemsSold}</td>
-                      <td className="p-3 text-center">{totalInventory - totalItemsSold}</td>
-                      <td className="p-3 text-right">${totalRevenue.toFixed(2)}</td>
-                      <td className="p-3 text-right text-green-600">${grossProfit.toFixed(2)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-            </div>
+            </>
           )}
         </TabsContent>
       </Tabs>
