@@ -33,11 +33,13 @@ const Bakes = () => {
       .eq('status', 'scheduled')
       .lte('scheduled_publish_date', now);
     
-    // Then fetch published bakes (excluding archived)
+    // Then fetch published bakes (excluding archived and hidden)
     const { data, error } = await supabase
       .from('bakes')
       .select('*')
       .eq('status', 'published')
+      .eq('is_archived', false)
+      .eq('is_visible', true)
       .order('date', { ascending: false });
 
     if (!error && data) {
@@ -50,6 +52,7 @@ const Bakes = () => {
     const { data, error } = await supabase
       .from('categories')
       .select('*')
+      .eq('show_in_filter', true)
       .order('display_order', { ascending: true });
 
     if (!error && data) {

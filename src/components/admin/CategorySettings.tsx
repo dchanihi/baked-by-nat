@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Trash2, GripVertical, Pencil, Check, X } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Pencil, Check, X, Filter } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { CATEGORY_ICONS, getIconComponent } from '@/lib/categoryIcons';
 import type { Tables } from '@/integrations/supabase/types';
 import {
@@ -95,6 +96,7 @@ const SortableCategory = ({
   category, 
   onDelete, 
   onEdit, 
+  onToggleFilter,
   isEditing, 
   editValue, 
   editIcon,
@@ -106,6 +108,7 @@ const SortableCategory = ({
   category: Category; 
   onDelete: (id: string, name: string) => void;
   onEdit: (id: string, name: string, icon: string) => void;
+  onToggleFilter: (id: string, showInFilter: boolean) => void;
   isEditing: boolean;
   editValue: string;
   editIcon: string;
@@ -172,6 +175,14 @@ const SortableCategory = ({
         <>
           <CategoryIcon className="w-5 h-5 text-primary-foreground" />
           <span className="flex-1 font-medium">{category.name}</span>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mr-2">
+            <Filter className="w-3 h-3" />
+            <span>Filter</span>
+            <Switch
+              checked={category.show_in_filter}
+              onCheckedChange={(checked) => onToggleFilter(category.id, checked)}
+            />
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -398,6 +409,27 @@ export const CategorySettings = () => {
     setEditIcon('cookie');
   };
 
+  const handleToggleFilter = async (id: string, showInFilter: boolean) => {
+    const { error } = await supabase
+      .from('categories')
+      .update({ show_in_filter: showInFilter })
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update filter visibility.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: showInFilter ? 'Category will show in filter.' : 'Category hidden from filter.',
+      });
+      loadCategories();
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -498,6 +530,7 @@ export const CategorySettings = () => {
                       category={category}
                       onDelete={handleDelete}
                       onEdit={handleEdit}
+                      onToggleFilter={handleToggleFilter}
                       isEditing={editingId === category.id}
                       editValue={editValue}
                       editIcon={editIcon}
