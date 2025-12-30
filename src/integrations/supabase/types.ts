@@ -25,6 +25,8 @@ export type Database = {
           id: string
           image_position: string | null
           image_url: string
+          is_archived: boolean
+          is_visible: boolean
           scheduled_publish_date: string | null
           status: string
           tags: string[] | null
@@ -41,6 +43,8 @@ export type Database = {
           id?: string
           image_position?: string | null
           image_url: string
+          is_archived?: boolean
+          is_visible?: boolean
           scheduled_publish_date?: string | null
           status?: string
           tags?: string[] | null
@@ -57,6 +61,8 @@ export type Database = {
           id?: string
           image_position?: string | null
           image_url?: string
+          is_archived?: boolean
+          is_visible?: boolean
           scheduled_publish_date?: string | null
           status?: string
           tags?: string[] | null
@@ -72,6 +78,7 @@ export type Database = {
           icon: string | null
           id: string
           name: string
+          show_in_filter: boolean
           updated_at: string
         }
         Insert: {
@@ -80,6 +87,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name: string
+          show_in_filter?: boolean
           updated_at?: string
         }
         Update: {
@@ -88,6 +96,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name?: string
+          show_in_filter?: boolean
           updated_at?: string
         }
         Relationships: []

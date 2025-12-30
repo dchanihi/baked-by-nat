@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BakesList } from '@/components/admin/BakesList';
 import { BakeEditor } from '@/components/admin/BakeEditor';
+import { ArchivedBakesList } from '@/components/admin/ArchivedBakesList';
 import { OrdersList } from '@/components/admin/OrdersList';
 import { OrderDetails } from '@/components/admin/OrderDetails';
 import { OrderOverview } from '@/components/admin/OrderOverview';
@@ -46,6 +47,7 @@ const Admin = () => {
   const [viewingEventStats, setViewingEventStats] = useState<Event | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [viewingArchive, setViewingArchive] = useState(false);
+  const [viewingBakeArchive, setViewingBakeArchive] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -166,6 +168,71 @@ const Admin = () => {
       toast({
         title: 'Success',
         description: 'Bake deleted successfully.',
+      });
+      loadBakes();
+    }
+  };
+
+  const handleArchiveBake = async (id: string) => {
+    if (!confirm('Are you sure you want to archive this bake?')) return;
+
+    const { error } = await supabase
+      .from('bakes')
+      .update({ is_archived: true })
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to archive bake.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Bake archived successfully.',
+      });
+      loadBakes();
+    }
+  };
+
+  const handleRestoreBake = async (id: string) => {
+    const { error } = await supabase
+      .from('bakes')
+      .update({ is_archived: false })
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to restore bake.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Bake restored successfully.',
+      });
+      loadBakes();
+    }
+  };
+
+  const handleToggleBakeVisibility = async (id: string, isVisible: boolean) => {
+    const { error } = await supabase
+      .from('bakes')
+      .update({ is_visible: isVisible })
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update visibility.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: isVisible ? 'Bake is now visible.' : 'Bake is now hidden.',
       });
       loadBakes();
     }
@@ -353,6 +420,13 @@ const Admin = () => {
             onSave={handleSaveComplete}
             onCancel={handleCancel}
           />
+        ) : viewingBakeArchive ? (
+          <ArchivedBakesList
+            bakes={bakes}
+            onRestore={handleRestoreBake}
+            onDelete={handleDelete}
+            onBack={() => setViewingBakeArchive(false)}
+          />
         ) : viewingArchive ? (
           <ArchivedEventsList
             events={events}
@@ -388,6 +462,9 @@ const Admin = () => {
                 bakes={bakes}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onArchive={handleArchiveBake}
+                onToggleVisibility={handleToggleBakeVisibility}
+                onViewArchive={() => setViewingBakeArchive(true)}
               />
             </TabsContent>
 
