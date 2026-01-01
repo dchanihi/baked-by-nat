@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3, Search, Filter, X, ShoppingCart, Trash2, History, Receipt, Tag, Percent } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, DollarSign, Package, TrendingUp, CheckCircle, Play, Clock, Calendar, Edit2, BarChart3, Search, Filter, X, ShoppingCart, Trash2, History, Receipt, Tag, Percent, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1335,6 +1335,20 @@ export const EventRunner = ({
                   })}
                   </SelectContent>
                 </Select>
+
+                {/* Sort */}
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-full sm:w-36">
+                    <ArrowUpDown className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Sort" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">Name (A-Z)</SelectItem>
+                    <SelectItem value="price-asc">Price (Low)</SelectItem>
+                    <SelectItem value="price-desc">Price (High)</SelectItem>
+                    <SelectItem value="remaining">Stock</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* POS Item Tiles Grid with Category Sidebar */}
@@ -1378,7 +1392,7 @@ export const EventRunner = ({
                               <div className="flex items-center gap-2 mb-3 py-1">
                                 <CategoryIcon className="w-4 h-4 text-muted-foreground/70" />
                                 <span className="text-xs font-medium text-muted-foreground/70 capitalize">{category}</span>
-                                <div className="flex-1 h-px bg-border/40" />
+                                <div className="flex-1 h-0.5 bg-border/50 rounded-full" />
                               </div>
                               
                               {/* Items Grid */}
@@ -1430,7 +1444,7 @@ export const EventRunner = ({
                               <div className="flex items-center gap-2 mb-3 py-1">
                                 <Package className="w-4 h-4 text-muted-foreground/70" />
                                 <span className="text-xs font-medium text-muted-foreground/70">Other</span>
-                                <div className="flex-1 h-px bg-border/40" />
+                                <div className="flex-1 h-0.5 bg-border/50 rounded-full" />
                               </div>
                               
                               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
