@@ -1375,13 +1375,10 @@ export const EventRunner = ({
                           return (
                             <div key={category} id={`category-section-${category.replace(/\s+/g, '-')}`}>
                               {/* Category Divider */}
-                              <div className="flex items-center gap-3 mb-3 sticky top-0 bg-background/95 backdrop-blur-sm py-2 z-10">
-                                <div className="w-8 h-8 rounded-lg bg-pink-soft/10 flex items-center justify-center">
-                                  <CategoryIcon className="w-4 h-4 text-pink-soft" />
-                                </div>
-                                <h3 className="font-semibold text-sm capitalize">{category}</h3>
-                                <div className="flex-1 h-px bg-border" />
-                                <span className="text-xs text-muted-foreground">{categoryItems.length} items</span>
+                              <div className="flex items-center gap-2 mb-3 py-1">
+                                <CategoryIcon className="w-4 h-4 text-muted-foreground/70" />
+                                <span className="text-xs font-medium text-muted-foreground/70 capitalize">{category}</span>
+                                <div className="flex-1 h-px bg-border/40" />
                               </div>
                               
                               {/* Items Grid */}
@@ -1430,13 +1427,10 @@ export const EventRunner = ({
                           
                           return (
                             <div id="category-section-uncategorized">
-                              <div className="flex items-center gap-3 mb-3 sticky top-0 bg-background/95 backdrop-blur-sm py-2 z-10">
-                                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-                                  <Package className="w-4 h-4 text-muted-foreground" />
-                                </div>
-                                <h3 className="font-semibold text-sm">Other</h3>
-                                <div className="flex-1 h-px bg-border" />
-                                <span className="text-xs text-muted-foreground">{uncategorizedItems.length} items</span>
+                              <div className="flex items-center gap-2 mb-3 py-1">
+                                <Package className="w-4 h-4 text-muted-foreground/70" />
+                                <span className="text-xs font-medium text-muted-foreground/70">Other</span>
+                                <div className="flex-1 h-px bg-border/40" />
                               </div>
                               
                               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
