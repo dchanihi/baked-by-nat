@@ -12,6 +12,8 @@ import Order from "./pages/Order";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import Settings from "./pages/Settings";
+import Financials from "./pages/Financials";
+import Inventory from "./pages/Inventory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +33,8 @@ const App = () => (
           <Route path="/order" element={<Order />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/financials" element={<Financials />} />
+          <Route path="/admin/inventory" element={<Inventory />} />
           <Route path="/admin/settings" element={<Navigate to="/admin/settings/profile" replace />} />
           <Route path="/admin/settings/profile" element={<Settings />} />
           <Route path="/admin/settings/categories" element={<Settings />} />
