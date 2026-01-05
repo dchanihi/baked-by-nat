@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Settings, LogOut, DollarSign, Package } from 'lucide-react';
+import { Settings, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -96,24 +96,6 @@ const Navigation = () => {
             )}
             {isAdminRoute && (
               <>
-                <Link
-                  to="/admin/financials"
-                  className={`font-body text-sm transition-colors hover:text-pink-accent flex items-center gap-1 ${
-                    location.pathname === '/admin/financials' ? 'text-pink-accent font-medium' : 'text-foreground'
-                  }`}
-                >
-                  <DollarSign className="w-4 h-4" />
-                  financials
-                </Link>
-                <Link
-                  to="/admin/inventory"
-                  className={`font-body text-sm transition-colors hover:text-pink-accent flex items-center gap-1 ${
-                    location.pathname === '/admin/inventory' ? 'text-pink-accent font-medium' : 'text-foreground'
-                  }`}
-                >
-                  <Package className="w-4 h-4" />
-                  inventory
-                </Link>
                 <Link
                   to="/admin/settings/profile"
                   className={`font-body text-sm transition-colors hover:text-pink-accent flex items-center gap-1 ${
