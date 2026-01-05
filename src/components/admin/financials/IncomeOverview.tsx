@@ -9,17 +9,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, startOfMonth, endOfMonth, subMonths, parseISO, startOfYear, endOfYear } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Archive, TrendingUp, ShoppingCart, Calendar, DollarSign, Filter, X } from 'lucide-react';
+import { Archive, TrendingUp, ShoppingCart, Calendar, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 
 interface IncomeOverviewProps {
   onDataChange?: () => void;
+  selectedPeriod: string;
+  selectedLocation: string;
+  onLocationsLoaded?: (locations: string[]) => void;
 }
 
 interface EventSummary {
@@ -57,17 +58,14 @@ interface YearlyArchive {
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
+const IncomeOverview = ({ onDataChange, selectedPeriod, selectedLocation, onLocationsLoaded }: IncomeOverviewProps) => {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [archives, setArchives] = useState<YearlyArchive[]>([]);
   const [monthlyData, setMonthlyData] = useState<{ month: string; eventsRevenue: number; ordersCount: number }[]>([]);
-  const [selectedPeriod, setSelectedPeriod] = useState('year');
   const [loading, setLoading] = useState(true);
   const [archiving, setArchiving] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
-  const [locations, setLocations] = useState<string[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>('all');
 
   useEffect(() => {
     loadData();
@@ -97,7 +95,7 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
     if (eventsData) {
       // Extract unique locations for filtering
       const uniqueLocations = [...new Set(eventsData.map(e => e.location).filter(Boolean))] as string[];
-      setLocations(uniqueLocations);
+      onLocationsLoaded?.(uniqueLocations);
       const eventSummaries: EventSummary[] = [];
 
       for (const event of eventsData) {
@@ -295,11 +293,6 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
     }
   });
 
-  const clearFilters = () => {
-    setSelectedLocation('all');
-    setSelectedPeriod('year');
-  };
-
   const hasActiveFilters = selectedLocation !== 'all' || selectedPeriod !== 'year';
 
   const totalEventsRevenue = filteredEvents.reduce((sum, e) => sum + e.revenue, 0);
@@ -387,80 +380,21 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-                {hasActiveFilters && (
-                  <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                    {(selectedLocation !== 'all' ? 1 : 0) + (selectedPeriod !== 'year' ? 1 : 0)}
-                  </Badge>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80" align="start">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Time Period</label>
-                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="year">All Unarchived</SelectItem>
-                      <SelectItem value="month">This Month</SelectItem>
-                      <SelectItem value="3months">Last 3 Months</SelectItem>
-                      <SelectItem value="6months">Last 6 Months</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Location</label>
-                  <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Locations</SelectItem>
-                      {locations.map((location) => (
-                        <SelectItem key={location} value={location}>
-                          {location}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" className="w-full" onClick={clearFilters}>
-                    <X className="h-4 w-4 mr-2" />
-                    Clear Filters
-                  </Button>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-          
-          {hasActiveFilters && (
-            <div className="flex gap-1 flex-wrap">
-              {selectedPeriod !== 'year' && (
-                <Badge variant="secondary" className="text-xs">
-                  {selectedPeriod === 'month' ? 'This Month' : selectedPeriod === '3months' ? 'Last 3 Months' : 'Last 6 Months'}
-                </Badge>
-              )}
-              {selectedLocation !== 'all' && (
-                <Badge variant="secondary" className="text-xs">
-                  {selectedLocation}
-                </Badge>
-              )}
-            </div>
+      {/* Active filters display */}
+      {hasActiveFilters && (
+        <div className="flex gap-1 flex-wrap">
+          {selectedPeriod !== 'year' && (
+            <Badge variant="secondary" className="text-xs">
+              {selectedPeriod === 'month' ? 'This Month' : selectedPeriod === '3months' ? 'Last 3 Months' : 'Last 6 Months'}
+            </Badge>
+          )}
+          {selectedLocation !== 'all' && (
+            <Badge variant="secondary" className="text-xs">
+              {selectedLocation}
+            </Badge>
           )}
         </div>
-      </div>
+      )}
 
       {/* Summary Cards - Primary metrics large, secondary metrics smaller */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
