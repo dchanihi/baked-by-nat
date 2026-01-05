@@ -11,11 +11,12 @@ import {
 } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, startOfMonth, endOfMonth, subMonths, parseISO, startOfYear, endOfYear } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Archive, TrendingUp, ShoppingCart, Calendar, DollarSign } from 'lucide-react';
+import { Archive, TrendingUp, ShoppingCart, Calendar, DollarSign, Filter, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 
 interface IncomeOverviewProps {
   onDataChange?: () => void;
@@ -24,6 +25,7 @@ interface IncomeOverviewProps {
 interface EventSummary {
   id: string;
   name: string;
+  location: string | null;
   start_time: string;
   revenue: number;
   expenses: number;
@@ -37,7 +39,6 @@ interface OrderSummary {
   bake_title: string | null;
   quantity: number;
   created_at: string;
-  // Note: orders don't have prices in the current schema, so we track count only
 }
 
 interface YearlyArchive {
@@ -64,6 +65,9 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
   const [selectedPeriod, setSelectedPeriod] = useState('year');
   const [loading, setLoading] = useState(true);
   const [archiving, setArchiving] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [locations, setLocations] = useState<string[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>('all');
 
   useEffect(() => {
     loadData();
@@ -86,11 +90,14 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
     // Load ALL completed events (we'll filter out archived ones)
     const { data: eventsData } = await supabase
       .from('events')
-      .select('id, name, start_time')
+      .select('id, name, location, start_time')
       .eq('status', 'completed')
       .order('start_time', { ascending: false });
 
     if (eventsData) {
+      // Extract unique locations for filtering
+      const uniqueLocations = [...new Set(eventsData.map(e => e.location).filter(Boolean))] as string[];
+      setLocations(uniqueLocations);
       const eventSummaries: EventSummary[] = [];
 
       for (const event of eventsData) {
@@ -131,6 +138,7 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
         eventSummaries.push({
           id: event.id,
           name: event.name,
+          location: event.location,
           start_time: event.start_time,
           revenue,
           expenses,
@@ -265,6 +273,11 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
   };
 
   const filteredEvents = events.filter(event => {
+    // Filter by location first
+    if (selectedLocation !== 'all' && event.location !== selectedLocation) {
+      return false;
+    }
+    
     if (selectedPeriod === 'year') return true;
     
     const eventDate = parseISO(event.start_time);
@@ -281,6 +294,13 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
         return true;
     }
   });
+
+  const clearFilters = () => {
+    setSelectedLocation('all');
+    setSelectedPeriod('year');
+  };
+
+  const hasActiveFilters = selectedLocation !== 'all' || selectedPeriod !== 'year';
 
   const totalEventsRevenue = filteredEvents.reduce((sum, e) => sum + e.revenue, 0);
   const totalEventsNetProfit = filteredEvents.reduce((sum, e) => sum + e.netProfit, 0);
@@ -303,31 +323,151 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
     );
   }
 
+  if (showArchive) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <Button variant="outline" onClick={() => setShowArchive(false)}>
+            ← Back to Income
+          </Button>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Yearly Archives</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Year</TableHead>
+                  <TableHead className="text-right">Total Revenue</TableHead>
+                  <TableHead className="text-right">Total Expenses</TableHead>
+                  <TableHead className="text-right">Net Profit</TableHead>
+                  <TableHead className="text-right">Events</TableHead>
+                  <TableHead className="text-right">Orders</TableHead>
+                  <TableHead className="text-right">Items Sold</TableHead>
+                  <TableHead>Archived</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {archives.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No archived years yet. Archive a year to see historical data here.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  archives.map((archive) => (
+                    <TableRow key={archive.id}>
+                      <TableCell className="font-bold">{archive.year}</TableCell>
+                      <TableCell className="text-right text-green-600">
+                        ${Number(archive.total_revenue).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right text-red-600">
+                        ${Number(archive.total_expenses).toFixed(2)}
+                      </TableCell>
+                      <TableCell className={`text-right font-medium ${Number(archive.net_profit) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${Number(archive.net_profit).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">{archive.total_events_completed}</TableCell>
+                      <TableCell className="text-right">{archive.total_orders_completed}</TableCell>
+                      <TableCell className="text-right">{archive.total_items_sold}</TableCell>
+                      <TableCell>{format(parseISO(archive.archived_at), 'MMM d, yyyy')}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <Tabs defaultValue="current" className="space-y-6">
-      <div className="flex justify-between items-center">
-        <TabsList>
-          <TabsTrigger value="current">Unarchived Data</TabsTrigger>
-          <TabsTrigger value="archive">
-            <Archive className="h-4 w-4 mr-2" />
-            Archive
-          </TabsTrigger>
-        </TabsList>
-        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select period" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="year">All Unarchived</SelectItem>
-            <SelectItem value="month">This Month</SelectItem>
-            <SelectItem value="3months">Last 3 Months</SelectItem>
-            <SelectItem value="6months">Last 6 Months</SelectItem>
-          </SelectContent>
-        </Select>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                Filters
+                {hasActiveFilters && (
+                  <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    {(selectedLocation !== 'all' ? 1 : 0) + (selectedPeriod !== 'year' ? 1 : 0)}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="start">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Time Period</label>
+                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="year">All Unarchived</SelectItem>
+                      <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="3months">Last 3 Months</SelectItem>
+                      <SelectItem value="6months">Last 6 Months</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Location</label>
+                  <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Locations</SelectItem>
+                      {locations.map((location) => (
+                        <SelectItem key={location} value={location}>
+                          {location}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" className="w-full" onClick={clearFilters}>
+                    <X className="h-4 w-4 mr-2" />
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+          
+          {hasActiveFilters && (
+            <div className="flex gap-1 flex-wrap">
+              {selectedPeriod !== 'year' && (
+                <Badge variant="secondary" className="text-xs">
+                  {selectedPeriod === 'month' ? 'This Month' : selectedPeriod === '3months' ? 'Last 3 Months' : 'Last 6 Months'}
+                </Badge>
+              )}
+              {selectedLocation !== 'all' && (
+                <Badge variant="secondary" className="text-xs">
+                  {selectedLocation}
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+        
+        <Button variant="outline" size="sm" onClick={() => setShowArchive(true)}>
+          <Archive className="h-4 w-4 mr-2" />
+          View Archives
+        </Button>
       </div>
 
-      <TabsContent value="current" className="space-y-6">
-        {/* Summary Cards - Primary metrics large, secondary metrics smaller */}
+      {/* Summary Cards - Primary metrics large, secondary metrics smaller */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -552,60 +692,7 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
             </Table>
           </CardContent>
         </Card>
-      </TabsContent>
-
-      <TabsContent value="archive" className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Yearly Archives</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Year</TableHead>
-                  <TableHead className="text-right">Total Revenue</TableHead>
-                  <TableHead className="text-right">Total Expenses</TableHead>
-                  <TableHead className="text-right">Net Profit</TableHead>
-                  <TableHead className="text-right">Events</TableHead>
-                  <TableHead className="text-right">Orders</TableHead>
-                  <TableHead className="text-right">Items Sold</TableHead>
-                  <TableHead>Archived</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {archives.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No archived years yet. Archive a year to see historical data here.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  archives.map((archive) => (
-                    <TableRow key={archive.id}>
-                      <TableCell className="font-bold">{archive.year}</TableCell>
-                      <TableCell className="text-right text-green-600">
-                        ${Number(archive.total_revenue).toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right text-red-600">
-                        ${Number(archive.total_expenses).toFixed(2)}
-                      </TableCell>
-                      <TableCell className={`text-right font-medium ${Number(archive.net_profit) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ${Number(archive.net_profit).toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">{archive.total_events_completed}</TableCell>
-                      <TableCell className="text-right">{archive.total_orders_completed}</TableCell>
-                      <TableCell className="text-right">{archive.total_items_sold}</TableCell>
-                      <TableCell>{format(parseISO(archive.archived_at), 'MMM d, yyyy')}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+    </div>
   );
 };
 
