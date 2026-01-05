@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, TrendingUp, TrendingDown, PieChart, Calendar, Filter, X } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns';
 import IncomeOverview from '@/components/admin/financials/IncomeOverview';
 import ExpensesManager from '@/components/admin/financials/ExpensesManager';
 
@@ -27,9 +27,16 @@ const Financials = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('year');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [locations, setLocations] = useState<string[]>([]);
+
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadSummaryData();
+    }
+  }, [isAdmin, selectedPeriod, selectedLocation]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -60,42 +67,157 @@ const Financials = () => {
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
 
-    // Load event sales for total revenue
-    const { data: salesData } = await supabase
-      .from('event_sales')
-      .select('total_price');
+    // Get archived years to exclude
+    const { data: archivesData } = await supabase
+      .from('yearly_archives')
+      .select('year');
+    
+    const archivedYears = archivesData?.map(a => a.year) || [];
 
-    const totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
+    // Load all completed events (we'll filter by location and period)
+    const { data: eventsData } = await supabase
+      .from('events')
+      .select('id, location, start_time')
+      .eq('status', 'completed');
 
-    // Load all expenses
-    const { data: expensesData } = await supabase
-      .from('expenses')
-      .select('amount');
+    // Filter events based on archived years, location, and period
+    const filteredEvents = eventsData?.filter(event => {
+      const eventDate = parseISO(event.start_time);
+      const eventYear = eventDate.getFullYear();
+      
+      // Skip archived years
+      if (archivedYears.includes(eventYear)) return false;
+      
+      // Filter by location
+      if (selectedLocation !== 'all' && event.location !== selectedLocation) return false;
+      
+      // Filter by period
+      if (selectedPeriod !== 'year') {
+        switch (selectedPeriod) {
+          case 'month':
+            if (eventDate < startOfMonth(now) || eventDate > endOfMonth(now)) return false;
+            break;
+          case '3months':
+            if (eventDate < subMonths(now, 3)) return false;
+            break;
+          case '6months':
+            if (eventDate < subMonths(now, 6)) return false;
+            break;
+        }
+      }
+      
+      return true;
+    }) || [];
 
-    const { data: eventExpensesData } = await supabase
-      .from('event_expenses')
-      .select('amount');
+    const filteredEventIds = filteredEvents.map(e => e.id);
 
-    const totalExpenses = 
-      (expensesData?.reduce((sum, exp) => sum + Number(exp.amount), 0) || 0) +
-      (eventExpensesData?.reduce((sum, exp) => sum + Number(exp.amount), 0) || 0);
+    // Get items for filtered events
+    let totalRevenue = 0;
+    let totalEventExpenses = 0;
 
-    // Monthly data
-    const { data: monthlySales } = await supabase
-      .from('event_sales')
-      .select('total_price, created_at')
-      .gte('created_at', monthStart.toISOString())
-      .lte('created_at', monthEnd.toISOString());
+    if (filteredEventIds.length > 0) {
+      const { data: items } = await supabase
+        .from('event_items')
+        .select('id')
+        .in('event_id', filteredEventIds);
 
-    const monthlyRevenue = monthlySales?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
+      if (items && items.length > 0) {
+        const itemIds = items.map(i => i.id);
+        
+        const { data: salesData } = await supabase
+          .from('event_sales')
+          .select('total_price')
+          .in('event_item_id', itemIds);
 
-    const { data: monthlyExp } = await supabase
+        totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
+      }
+
+      // Get event expenses for filtered events
+      const { data: eventExpensesData } = await supabase
+        .from('event_expenses')
+        .select('amount')
+        .in('event_id', filteredEventIds);
+
+      totalEventExpenses = eventExpensesData?.reduce((sum, exp) => sum + Number(exp.amount), 0) || 0;
+    }
+
+    // Load general expenses (filter by period if applicable)
+    let expensesQuery = supabase.from('expenses').select('amount, expense_date');
+    
+    if (selectedPeriod !== 'year') {
+      let periodStart: Date;
+      switch (selectedPeriod) {
+        case 'month':
+          periodStart = startOfMonth(now);
+          break;
+        case '3months':
+          periodStart = subMonths(now, 3);
+          break;
+        case '6months':
+          periodStart = subMonths(now, 6);
+          break;
+        default:
+          periodStart = new Date(0);
+      }
+      expensesQuery = expensesQuery.gte('expense_date', format(periodStart, 'yyyy-MM-dd'));
+    }
+
+    const { data: expensesData } = await expensesQuery;
+
+    // Filter out archived years from expenses
+    const filteredExpenses = expensesData?.filter(exp => {
+      if (!exp.expense_date) return true;
+      const expYear = new Date(exp.expense_date).getFullYear();
+      return !archivedYears.includes(expYear);
+    }) || [];
+
+    const totalGeneralExpenses = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+    const totalExpenses = totalEventExpenses + totalGeneralExpenses;
+
+    // Monthly data (current month only, respecting location filter)
+    let monthlyRevenue = 0;
+    let monthlyEventExpenses = 0;
+
+    const monthFilteredEvents = filteredEvents.filter(event => {
+      const eventDate = parseISO(event.start_time);
+      return eventDate >= monthStart && eventDate <= monthEnd;
+    });
+
+    const monthFilteredEventIds = monthFilteredEvents.map(e => e.id);
+
+    if (monthFilteredEventIds.length > 0) {
+      const { data: monthItems } = await supabase
+        .from('event_items')
+        .select('id')
+        .in('event_id', monthFilteredEventIds);
+
+      if (monthItems && monthItems.length > 0) {
+        const monthItemIds = monthItems.map(i => i.id);
+        
+        const { data: monthlySales } = await supabase
+          .from('event_sales')
+          .select('total_price')
+          .in('event_item_id', monthItemIds);
+
+        monthlyRevenue = monthlySales?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
+      }
+
+      const { data: monthEventExpenses } = await supabase
+        .from('event_expenses')
+        .select('amount')
+        .in('event_id', monthFilteredEventIds);
+
+      monthlyEventExpenses = monthEventExpenses?.reduce((sum, exp) => sum + Number(exp.amount), 0) || 0;
+    }
+
+    const { data: monthlyGeneralExp } = await supabase
       .from('expenses')
       .select('amount, expense_date')
       .gte('expense_date', format(monthStart, 'yyyy-MM-dd'))
       .lte('expense_date', format(monthEnd, 'yyyy-MM-dd'));
 
-    const monthlyExpenses = monthlyExp?.reduce((sum, exp) => sum + Number(exp.amount), 0) || 0;
+    const monthlyGeneralExpenses = monthlyGeneralExp?.reduce((sum, exp) => sum + Number(exp.amount), 0) || 0;
+    const monthlyExpenses = monthlyEventExpenses + monthlyGeneralExpenses;
 
     setSummaryData({
       totalRevenue,
