@@ -689,6 +689,51 @@ export type Database = {
         }
         Relationships: []
       }
+      yearly_archives: {
+        Row: {
+          archived_at: string
+          created_at: string
+          events_revenue: number
+          id: string
+          net_profit: number
+          orders_revenue: number
+          total_events_completed: number
+          total_expenses: number
+          total_items_sold: number
+          total_orders_completed: number
+          total_revenue: number
+          year: number
+        }
+        Insert: {
+          archived_at?: string
+          created_at?: string
+          events_revenue?: number
+          id?: string
+          net_profit?: number
+          orders_revenue?: number
+          total_events_completed?: number
+          total_expenses?: number
+          total_items_sold?: number
+          total_orders_completed?: number
+          total_revenue?: number
+          year: number
+        }
+        Update: {
+          archived_at?: string
+          created_at?: string
+          events_revenue?: number
+          id?: string
+          net_profit?: number
+          orders_revenue?: number
+          total_events_completed?: number
+          total_expenses?: number
+          total_items_sold?: number
+          total_orders_completed?: number
+          total_revenue?: number
+          year?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
