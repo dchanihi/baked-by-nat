@@ -76,19 +76,28 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
     const yearStart = startOfYear(new Date(currentYear, 0, 1));
     const yearEnd = endOfYear(new Date(currentYear, 11, 31));
 
-    // Load completed events with their sales and expenses (current year only for main view)
+    // Get archived years to exclude
+    const { data: archivesData } = await supabase
+      .from('yearly_archives')
+      .select('year');
+    
+    const archivedYears = archivesData?.map(a => a.year) || [];
+
+    // Load ALL completed events (we'll filter out archived ones)
     const { data: eventsData } = await supabase
       .from('events')
       .select('id, name, start_time')
       .eq('status', 'completed')
-      .gte('start_time', yearStart.toISOString())
-      .lte('start_time', yearEnd.toISOString())
       .order('start_time', { ascending: false });
 
     if (eventsData) {
       const eventSummaries: EventSummary[] = [];
 
       for (const event of eventsData) {
+        // Skip events from archived years
+        const eventYear = parseISO(event.start_time).getFullYear();
+        if (archivedYears.includes(eventYear)) continue;
+
         // Get items for this event
         const { data: items } = await supabase
           .from('event_items')
@@ -133,27 +142,30 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
       setEvents(eventSummaries);
     }
 
-    // Load completed orders (current year only)
+    // Load completed orders (exclude archived years)
     const { data: ordersData } = await supabase
       .from('orders')
       .select('id, customer_name, bake_title, quantity, created_at')
       .eq('status', 'completed')
-      .gte('created_at', yearStart.toISOString())
-      .lte('created_at', yearEnd.toISOString())
       .order('created_at', { ascending: false });
 
     if (ordersData) {
-      setOrders(ordersData);
+      // Filter out orders from archived years
+      const filteredOrders = ordersData.filter(order => {
+        const orderYear = parseISO(order.created_at).getFullYear();
+        return !archivedYears.includes(orderYear);
+      });
+      setOrders(filteredOrders);
     }
 
-    // Load yearly archives
-    const { data: archivesData } = await supabase
+    // Load yearly archives for archive tab
+    const { data: fullArchivesData } = await supabase
       .from('yearly_archives')
       .select('*')
       .order('year', { ascending: false });
 
-    if (archivesData) {
-      setArchives(archivesData as YearlyArchive[]);
+    if (fullArchivesData) {
+      setArchives(fullArchivesData as YearlyArchive[]);
     }
 
     // Calculate monthly data for current year
@@ -295,7 +307,7 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
     <Tabs defaultValue="current" className="space-y-6">
       <div className="flex justify-between items-center">
         <TabsList>
-          <TabsTrigger value="current">Current Year ({new Date().getFullYear()})</TabsTrigger>
+          <TabsTrigger value="current">Unarchived Data</TabsTrigger>
           <TabsTrigger value="archive">
             <Archive className="h-4 w-4 mr-2" />
             Archive
@@ -306,7 +318,7 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="year">This Year</SelectItem>
+            <SelectItem value="year">All Unarchived</SelectItem>
             <SelectItem value="month">This Month</SelectItem>
             <SelectItem value="3months">Last 3 Months</SelectItem>
             <SelectItem value="6months">Last 6 Months</SelectItem>
@@ -315,15 +327,15 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
       </div>
 
       <TabsContent value="current" className="space-y-6">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Summary Cards - Primary metrics large, secondary metrics smaller */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Events Revenue</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">${totalEventsRevenue.toFixed(2)}</div>
+              <div className="text-3xl font-bold text-green-600">${totalEventsRevenue.toFixed(2)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -332,36 +344,46 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${totalEventsNetProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`text-3xl font-bold ${totalEventsNetProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 ${totalEventsNetProfit.toFixed(2)}
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Items Sold</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalItemsSold}</div>
+        </div>
+        
+        {/* Secondary metrics - smaller cards */}
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="py-2">
+            <CardContent className="pt-2 pb-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Items Sold</p>
+                  <p className="text-lg font-semibold">{totalItemsSold}</p>
+                </div>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed Orders</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{completedOrdersCount}</div>
+          <Card className="py-2">
+            <CardContent className="pt-2 pb-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Orders</p>
+                  <p className="text-lg font-semibold">{completedOrdersCount}</p>
+                </div>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Events Completed</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filteredEvents.length}</div>
+          <Card className="py-2">
+            <CardContent className="pt-2 pb-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Events</p>
+                  <p className="text-lg font-semibold">{filteredEvents.length}</p>
+                </div>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -370,7 +392,7 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Monthly Revenue ({new Date().getFullYear()})</CardTitle>
+              <CardTitle>Monthly Revenue</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
@@ -461,7 +483,7 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
                 {filteredEvents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No completed events found for {new Date().getFullYear()}
+                      No completed events found
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -490,7 +512,7 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
         {/* Completed Orders Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Completed Orders ({new Date().getFullYear()})</CardTitle>
+            <CardTitle>Completed Orders</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
@@ -506,7 +528,7 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
                 {orders.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                      No completed orders found for {new Date().getFullYear()}
+                      No completed orders found
                     </TableCell>
                   </TableRow>
                 ) : (
