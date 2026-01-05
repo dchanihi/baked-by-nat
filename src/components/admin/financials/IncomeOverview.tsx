@@ -460,11 +460,6 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
             </div>
           )}
         </div>
-        
-        <Button variant="outline" size="sm" onClick={() => setShowArchive(true)}>
-          <Archive className="h-4 w-4 mr-2" />
-          View Archives
-        </Button>
       </div>
 
       {/* Summary Cards - Primary metrics large, secondary metrics smaller */}
