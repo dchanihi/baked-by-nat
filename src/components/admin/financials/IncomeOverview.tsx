@@ -10,8 +10,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { format, startOfMonth, endOfMonth, subMonths, parseISO, startOfYear, endOfYear } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Archive, TrendingUp, ShoppingCart, Calendar, DollarSign } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface IncomeOverviewProps {
   onDataChange?: () => void;
@@ -22,16 +26,44 @@ interface EventSummary {
   name: string;
   start_time: string;
   revenue: number;
+  expenses: number;
+  netProfit: number;
   itemsSold: number;
+}
+
+interface OrderSummary {
+  id: string;
+  customer_name: string;
+  bake_title: string | null;
+  quantity: number;
+  created_at: string;
+  // Note: orders don't have prices in the current schema, so we track count only
+}
+
+interface YearlyArchive {
+  id: string;
+  year: number;
+  total_revenue: number;
+  total_expenses: number;
+  net_profit: number;
+  orders_revenue: number;
+  events_revenue: number;
+  total_orders_completed: number;
+  total_events_completed: number;
+  total_items_sold: number;
+  archived_at: string;
 }
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
   const [events, setEvents] = useState<EventSummary[]>([]);
-  const [monthlyData, setMonthlyData] = useState<{ month: string; revenue: number }[]>([]);
-  const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [archives, setArchives] = useState<YearlyArchive[]>([]);
+  const [monthlyData, setMonthlyData] = useState<{ month: string; eventsRevenue: number; ordersCount: number }[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState('year');
   const [loading, setLoading] = useState(true);
+  const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -40,11 +72,17 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
   const loadData = async () => {
     setLoading(true);
 
-    // Load events with their sales
+    const currentYear = new Date().getFullYear();
+    const yearStart = startOfYear(new Date(currentYear, 0, 1));
+    const yearEnd = endOfYear(new Date(currentYear, 11, 31));
+
+    // Load completed events with their sales and expenses (current year only for main view)
     const { data: eventsData } = await supabase
       .from('events')
       .select('id, name, start_time')
       .eq('status', 'completed')
+      .gte('start_time', yearStart.toISOString())
+      .lte('start_time', yearEnd.toISOString())
       .order('start_time', { ascending: false });
 
     if (eventsData) {
@@ -57,6 +95,9 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
           .select('id')
           .eq('event_id', event.id);
 
+        let revenue = 0;
+        let itemsSold = 0;
+
         if (items && items.length > 0) {
           const itemIds = items.map(i => i.id);
           
@@ -66,28 +107,65 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
             .select('total_price, quantity')
             .in('event_item_id', itemIds);
 
-          const revenue = sales?.reduce((sum, s) => sum + Number(s.total_price), 0) || 0;
-          const itemsSold = sales?.reduce((sum, s) => sum + s.quantity, 0) || 0;
-
-          eventSummaries.push({
-            id: event.id,
-            name: event.name,
-            start_time: event.start_time,
-            revenue,
-            itemsSold,
-          });
+          revenue = sales?.reduce((sum, s) => sum + Number(s.total_price), 0) || 0;
+          itemsSold = sales?.reduce((sum, s) => sum + s.quantity, 0) || 0;
         }
+
+        // Get expenses for this event
+        const { data: expensesData } = await supabase
+          .from('event_expenses')
+          .select('amount')
+          .eq('event_id', event.id);
+
+        const expenses = expensesData?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+
+        eventSummaries.push({
+          id: event.id,
+          name: event.name,
+          start_time: event.start_time,
+          revenue,
+          expenses,
+          netProfit: revenue - expenses,
+          itemsSold,
+        });
       }
 
       setEvents(eventSummaries);
     }
 
-    // Calculate monthly revenue for last 12 months
-    const months: { month: string; revenue: number }[] = [];
+    // Load completed orders (current year only)
+    const { data: ordersData } = await supabase
+      .from('orders')
+      .select('id, customer_name, bake_title, quantity, created_at')
+      .eq('status', 'completed')
+      .gte('created_at', yearStart.toISOString())
+      .lte('created_at', yearEnd.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (ordersData) {
+      setOrders(ordersData);
+    }
+
+    // Load yearly archives
+    const { data: archivesData } = await supabase
+      .from('yearly_archives')
+      .select('*')
+      .order('year', { ascending: false });
+
+    if (archivesData) {
+      setArchives(archivesData as YearlyArchive[]);
+    }
+
+    // Calculate monthly data for current year
+    const months: { month: string; eventsRevenue: number; ordersCount: number }[] = [];
     const now = new Date();
 
     for (let i = 11; i >= 0; i--) {
       const monthDate = subMonths(now, i);
+      
+      // Only include months from current year
+      if (monthDate.getFullYear() !== currentYear) continue;
+      
       const monthStart = startOfMonth(monthDate);
       const monthEnd = endOfMonth(monthDate);
 
@@ -97,11 +175,19 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
-      const revenue = sales?.reduce((sum, s) => sum + Number(s.total_price), 0) || 0;
+      const eventsRevenue = sales?.reduce((sum, s) => sum + Number(s.total_price), 0) || 0;
+
+      const { data: monthOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('status', 'completed')
+        .gte('created_at', monthStart.toISOString())
+        .lte('created_at', monthEnd.toISOString());
 
       months.push({
-        month: format(monthDate, 'MMM yyyy'),
-        revenue,
+        month: format(monthDate, 'MMM'),
+        eventsRevenue,
+        ordersCount: monthOrders?.length || 0,
       });
     }
 
@@ -109,8 +195,65 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
     setLoading(false);
   };
 
+  const archiveCurrentYear = async () => {
+    const currentYear = new Date().getFullYear();
+    
+    // Check if already archived
+    const existingArchive = archives.find(a => a.year === currentYear);
+    if (existingArchive) {
+      toast.error(`Year ${currentYear} has already been archived`);
+      return;
+    }
+
+    setArchiving(true);
+
+    try {
+      const totalEventsRevenue = events.reduce((sum, e) => sum + e.revenue, 0);
+      const totalEventsExpenses = events.reduce((sum, e) => sum + e.expenses, 0);
+      const totalItemsSold = events.reduce((sum, e) => sum + e.itemsSold, 0);
+
+      // Get all expenses for current year
+      const yearStart = startOfYear(new Date(currentYear, 0, 1));
+      const yearEnd = endOfYear(new Date(currentYear, 11, 31));
+
+      const { data: generalExpenses } = await supabase
+        .from('expenses')
+        .select('amount')
+        .gte('expense_date', format(yearStart, 'yyyy-MM-dd'))
+        .lte('expense_date', format(yearEnd, 'yyyy-MM-dd'));
+
+      const totalGeneralExpenses = generalExpenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      const totalExpenses = totalEventsExpenses + totalGeneralExpenses;
+
+      const { error } = await supabase
+        .from('yearly_archives')
+        .insert({
+          year: currentYear,
+          total_revenue: totalEventsRevenue,
+          total_expenses: totalExpenses,
+          net_profit: totalEventsRevenue - totalExpenses,
+          orders_revenue: 0, // Orders don't have prices in current schema
+          events_revenue: totalEventsRevenue,
+          total_orders_completed: orders.length,
+          total_events_completed: events.length,
+          total_items_sold: totalItemsSold,
+        });
+
+      if (error) throw error;
+
+      toast.success(`Successfully archived ${currentYear} financial data`);
+      loadData();
+      onDataChange?.();
+    } catch (error) {
+      console.error('Error archiving year:', error);
+      toast.error('Failed to archive year');
+    } finally {
+      setArchiving(false);
+    }
+  };
+
   const filteredEvents = events.filter(event => {
-    if (selectedPeriod === 'all') return true;
+    if (selectedPeriod === 'year') return true;
     
     const eventDate = parseISO(event.start_time);
     const now = new Date();
@@ -122,15 +265,15 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
         return eventDate >= subMonths(now, 3);
       case '6months':
         return eventDate >= subMonths(now, 6);
-      case 'year':
-        return eventDate >= subMonths(now, 12);
       default:
         return true;
     }
   });
 
-  const totalRevenue = filteredEvents.reduce((sum, e) => sum + e.revenue, 0);
+  const totalEventsRevenue = filteredEvents.reduce((sum, e) => sum + e.revenue, 0);
+  const totalEventsNetProfit = filteredEvents.reduce((sum, e) => sum + e.netProfit, 0);
   const totalItemsSold = filteredEvents.reduce((sum, e) => sum + e.itemsSold, 0);
+  const completedOrdersCount = orders.length;
 
   const pieData = filteredEvents
     .filter(e => e.revenue > 0)
@@ -149,153 +292,298 @@ const IncomeOverview = ({ onDataChange }: IncomeOverviewProps) => {
   }
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="current" className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Income Overview</h2>
+        <TabsList>
+          <TabsTrigger value="current">Current Year ({new Date().getFullYear()})</TabsTrigger>
+          <TabsTrigger value="archive">
+            <Archive className="h-4 w-4 mr-2" />
+            Archive
+          </TabsTrigger>
+        </TabsList>
         <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="year">This Year</SelectItem>
             <SelectItem value="month">This Month</SelectItem>
             <SelectItem value="3months">Last 3 Months</SelectItem>
             <SelectItem value="6months">Last 6 Months</SelectItem>
-            <SelectItem value="year">Last Year</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue (Period)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">${totalRevenue.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Items Sold</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalItemsSold}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Events</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{filteredEvents.length}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <TabsContent value="current" className="space-y-6">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Events Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">${totalEventsRevenue.toFixed(2)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Events Net Profit</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${totalEventsNetProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                ${totalEventsNetProfit.toFixed(2)}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Items Sold</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalItemsSold}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Completed Orders</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{completedOrdersCount}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Events Completed</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{filteredEvents.length}</div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Revenue (Last 12 Months)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} className="text-muted-foreground" />
-                  <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" tickFormatter={(value) => `$${value}`} />
-                  <Tooltip 
-                    formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']}
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                  />
-                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Revenue by Event (Top 5)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              {pieData.length > 0 ? (
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Revenue ({new Date().getFullYear()})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={({ name, percent }) => `${name.slice(0, 15)}${name.length > 15 ? '...' : ''} (${(percent * 100).toFixed(0)}%)`}
-                    >
-                      {pieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
+                  <BarChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} className="text-muted-foreground" />
+                    <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" tickFormatter={(value) => `$${value}`} />
                     <Tooltip 
-                      formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']}
+                      formatter={(value: number, name: string) => [
+                        name === 'eventsRevenue' ? `$${value.toFixed(2)}` : value,
+                        name === 'eventsRevenue' ? 'Events Revenue' : 'Orders Completed'
+                      ]}
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
                     />
-                  </PieChart>
+                    <Bar dataKey="eventsRevenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No revenue data available
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Events Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Event Revenue Details</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Event Name</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Items Sold</TableHead>
-                <TableHead className="text-right">Revenue</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEvents.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue by Event (Top 5)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                {pieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name.slice(0, 15)}${name.length > 15 ? '...' : ''} (${(percent * 100).toFixed(0)}%)`}
+                      >
+                        {pieData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']}
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    No revenue data available
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Events Table */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Event Revenue Details</CardTitle>
+            <Button 
+              variant="outline" 
+              onClick={archiveCurrentYear}
+              disabled={archiving || events.length === 0}
+            >
+              <Archive className="h-4 w-4 mr-2" />
+              {archiving ? 'Archiving...' : `Archive ${new Date().getFullYear()}`}
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    No completed events found
-                  </TableCell>
+                  <TableHead>Event Name</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Items Sold</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Expenses</TableHead>
+                  <TableHead className="text-right">Net Profit</TableHead>
                 </TableRow>
-              ) : (
-                filteredEvents.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell className="font-medium">{event.name}</TableCell>
-                    <TableCell>{format(parseISO(event.start_time), 'MMM d, yyyy')}</TableCell>
-                    <TableCell className="text-right">{event.itemsSold}</TableCell>
-                    <TableCell className="text-right font-medium text-green-600">
-                      ${event.revenue.toFixed(2)}
+              </TableHeader>
+              <TableBody>
+                {filteredEvents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No completed events found for {new Date().getFullYear()}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+                ) : (
+                  filteredEvents.map((event) => (
+                    <TableRow key={event.id}>
+                      <TableCell className="font-medium">{event.name}</TableCell>
+                      <TableCell>{format(parseISO(event.start_time), 'MMM d, yyyy')}</TableCell>
+                      <TableCell className="text-right">{event.itemsSold}</TableCell>
+                      <TableCell className="text-right text-green-600">
+                        ${event.revenue.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right text-red-600">
+                        ${event.expenses.toFixed(2)}
+                      </TableCell>
+                      <TableCell className={`text-right font-medium ${event.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${event.netProfit.toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Completed Orders Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Completed Orders ({new Date().getFullYear()})</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Item</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      No completed orders found for {new Date().getFullYear()}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  orders.slice(0, 10).map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">{order.customer_name}</TableCell>
+                      <TableCell>{order.bake_title || 'Custom Order'}</TableCell>
+                      <TableCell className="text-right">{order.quantity}</TableCell>
+                      <TableCell>{format(parseISO(order.created_at), 'MMM d, yyyy')}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+                {orders.length > 10 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-2 text-muted-foreground">
+                      ... and {orders.length - 10} more orders
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="archive" className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Yearly Archives</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Year</TableHead>
+                  <TableHead className="text-right">Total Revenue</TableHead>
+                  <TableHead className="text-right">Total Expenses</TableHead>
+                  <TableHead className="text-right">Net Profit</TableHead>
+                  <TableHead className="text-right">Events</TableHead>
+                  <TableHead className="text-right">Orders</TableHead>
+                  <TableHead className="text-right">Items Sold</TableHead>
+                  <TableHead>Archived</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {archives.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No archived years yet. Archive a year to see historical data here.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  archives.map((archive) => (
+                    <TableRow key={archive.id}>
+                      <TableCell className="font-bold">{archive.year}</TableCell>
+                      <TableCell className="text-right text-green-600">
+                        ${Number(archive.total_revenue).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right text-red-600">
+                        ${Number(archive.total_expenses).toFixed(2)}
+                      </TableCell>
+                      <TableCell className={`text-right font-medium ${Number(archive.net_profit) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${Number(archive.net_profit).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">{archive.total_events_completed}</TableCell>
+                      <TableCell className="text-right">{archive.total_orders_completed}</TableCell>
+                      <TableCell className="text-right">{archive.total_items_sold}</TableCell>
+                      <TableCell>{format(parseISO(archive.archived_at), 'MMM d, yyyy')}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
   );
 };
 
