@@ -492,7 +492,7 @@ const Admin = () => {
                   <TabsTrigger value="expenses">expenses</TabsTrigger>
                 </TabsList>
                 <TabsContent value="income">
-                  <IncomeOverview />
+                  <IncomeOverview selectedPeriod="year" selectedLocation="all" />
                 </TabsContent>
                 <TabsContent value="expenses">
                   <ExpensesManager />

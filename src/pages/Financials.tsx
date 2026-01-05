@@ -4,7 +4,11 @@ import Navigation from '@/components/Navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DollarSign, TrendingUp, TrendingDown, PieChart, Calendar } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { DollarSign, TrendingUp, TrendingDown, PieChart, Calendar, Filter, X } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import IncomeOverview from '@/components/admin/financials/IncomeOverview';
 import ExpensesManager from '@/components/admin/financials/ExpensesManager';
@@ -20,7 +24,9 @@ const Financials = () => {
     monthlyRevenue: 0,
     monthlyExpenses: 0,
   });
-
+  const [selectedPeriod, setSelectedPeriod] = useState('year');
+  const [selectedLocation, setSelectedLocation] = useState('all');
+  const [locations, setLocations] = useState<string[]>([]);
   useEffect(() => {
     checkAuth();
   }, []);
@@ -175,13 +181,79 @@ const Financials = () => {
         </div>
 
         <Tabs defaultValue="income" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="income">Income Overview</TabsTrigger>
-            <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <TabsList>
+              <TabsTrigger value="income">Income Overview</TabsTrigger>
+              <TabsTrigger value="expenses">Expenses</TabsTrigger>
+            </TabsList>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filters
+                  {(selectedLocation !== 'all' || selectedPeriod !== 'year') && (
+                    <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                      {(selectedLocation !== 'all' ? 1 : 0) + (selectedPeriod !== 'year' ? 1 : 0)}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80" align="end">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Time Period</label>
+                    <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select period" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="year">All Unarchived</SelectItem>
+                        <SelectItem value="month">This Month</SelectItem>
+                        <SelectItem value="3months">Last 3 Months</SelectItem>
+                        <SelectItem value="6months">Last 6 Months</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Location</label>
+                    <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Locations</SelectItem>
+                        {locations.map((location) => (
+                          <SelectItem key={location} value={location}>
+                            {location}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {(selectedLocation !== 'all' || selectedPeriod !== 'year') && (
+                    <Button variant="ghost" size="sm" className="w-full" onClick={() => {
+                      setSelectedLocation('all');
+                      setSelectedPeriod('year');
+                    }}>
+                      <X className="h-4 w-4 mr-2" />
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
 
           <TabsContent value="income">
-            <IncomeOverview onDataChange={loadSummaryData} />
+            <IncomeOverview 
+              onDataChange={loadSummaryData} 
+              selectedPeriod={selectedPeriod}
+              selectedLocation={selectedLocation}
+              onLocationsLoaded={setLocations}
+            />
           </TabsContent>
 
           <TabsContent value="expenses">
