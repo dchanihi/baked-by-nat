@@ -21,9 +21,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit2, Trash2, Package, AlertTriangle, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertTriangle, Search, History } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-
+import PurchaseHistoryDialog from './PurchaseHistoryDialog';
 interface InventoryItem {
   id: string;
   name: string;
@@ -44,6 +44,8 @@ const InventoryContent = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [selectedItemForHistory, setSelectedItemForHistory] = useState<InventoryItem | null>(null);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -396,15 +398,25 @@ const InventoryContent = () => {
                 filteredItems.map((item) => {
                   const isLowStock = item.minimum_stock && item.quantity <= item.minimum_stock;
                   return (
-                    <TableRow key={item.id}>
+                    <TableRow 
+                      key={item.id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setSelectedItemForHistory(item);
+                        setHistoryDialogOpen(true);
+                      }}
+                    >
                       <TableCell className="font-medium">
-                        <div>
-                          {item.name}
-                          {item.description && (
-                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                              {item.description}
-                            </p>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <div>
+                            {item.name}
+                            {item.description && (
+                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                          <History className="w-4 h-4 text-muted-foreground" />
                         </div>
                       </TableCell>
                       <TableCell>{item.category || '-'}</TableCell>
@@ -433,14 +445,20 @@ const InventoryContent = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => openEditDialog(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditDialog(item);
+                            }}
                           >
                             <Edit2 className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDelete(item.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(item.id);
+                            }}
                           >
                             <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
@@ -454,6 +472,14 @@ const InventoryContent = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Purchase History Dialog */}
+      <PurchaseHistoryDialog
+        item={selectedItemForHistory}
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        onPurchaseAdded={loadItems}
+      />
     </div>
   );
 };
