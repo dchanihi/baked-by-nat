@@ -16,6 +16,9 @@ import { ArchivedEventsList } from '@/components/admin/ArchivedEventsList';
 import { EventEditor } from '@/components/admin/EventEditor';
 import { EventRunner } from '@/components/admin/EventRunner';
 import { EventStatistics } from '@/components/admin/EventStatistics';
+import IncomeOverview from '@/components/admin/financials/IncomeOverview';
+import ExpensesManager from '@/components/admin/financials/ExpensesManager';
+import InventoryContent from '@/components/admin/InventoryContent';
 import Navigation from '@/components/Navigation';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -436,11 +439,13 @@ const Admin = () => {
           />
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full max-w-3xl grid-cols-4">
+            <TabsList className="grid w-full max-w-5xl grid-cols-6">
               <TabsTrigger value="overview">order overview</TabsTrigger>
               <TabsTrigger value="orders">view orders</TabsTrigger>
               <TabsTrigger value="bakes">manage bakes</TabsTrigger>
               <TabsTrigger value="events">events</TabsTrigger>
+              <TabsTrigger value="financials">financials</TabsTrigger>
+              <TabsTrigger value="inventory">inventory</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
@@ -478,6 +483,25 @@ const Admin = () => {
                 onCreate={handleCreateEvent}
                 onViewArchive={() => setViewingArchive(true)}
               />
+            </TabsContent>
+
+            <TabsContent value="financials" className="space-y-6">
+              <Tabs defaultValue="income" className="space-y-6">
+                <TabsList>
+                  <TabsTrigger value="income">income</TabsTrigger>
+                  <TabsTrigger value="expenses">expenses</TabsTrigger>
+                </TabsList>
+                <TabsContent value="income">
+                  <IncomeOverview />
+                </TabsContent>
+                <TabsContent value="expenses">
+                  <ExpensesManager />
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+
+            <TabsContent value="inventory" className="space-y-6">
+              <InventoryContent />
             </TabsContent>
           </Tabs>
         )}
