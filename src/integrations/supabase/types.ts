@@ -582,6 +582,56 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_purchases: {
+        Row: {
+          cost_per_unit: number
+          created_at: string
+          created_by: string | null
+          id: string
+          inventory_item_id: string
+          notes: string | null
+          purchase_date: string
+          quantity: number
+          supplier: string | null
+          total_cost: number
+          unit: string
+        }
+        Insert: {
+          cost_per_unit?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inventory_item_id: string
+          notes?: string | null
+          purchase_date?: string
+          quantity?: number
+          supplier?: string | null
+          total_cost?: number
+          unit?: string
+        }
+        Update: {
+          cost_per_unit?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inventory_item_id?: string
+          notes?: string | null
+          purchase_date?: string
+          quantity?: number
+          supplier?: string | null
+          total_cost?: number
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_purchases_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           additional_notes: string | null
