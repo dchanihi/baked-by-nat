@@ -34,6 +34,7 @@ const App = () => (
           <Route path="/admin/settings" element={<Navigate to="/admin/settings/profile" replace />} />
           <Route path="/admin/settings/profile" element={<Settings />} />
           <Route path="/admin/settings/categories" element={<Settings />} />
+          <Route path="/admin/settings/inventory-categories" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
