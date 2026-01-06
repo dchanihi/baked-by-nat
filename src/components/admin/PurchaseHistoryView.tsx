@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, Search, DollarSign, Package } from 'lucide-react';
+import { Plus, Trash2, Search, DollarSign, Package, Tag } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface InventoryItem {
@@ -664,13 +664,18 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
                 filteredPurchases.map((purchase) => (
                   <TableRow key={purchase.id}>
                     <TableCell className="text-xs py-2">
-                      {new Date(purchase.purchase_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                      {new Date(purchase.purchase_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </TableCell>
                     <TableCell className="text-xs py-2 font-medium">
                       {purchase.inventory?.name || 'Unknown'}
                     </TableCell>
                     <TableCell className="text-xs py-2">
-                      {purchase.inventory?.category || '-'}
+                      {purchase.inventory?.category ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-primary animate-pulse" />
+                          {purchase.inventory.category}
+                        </span>
+                      ) : '-'}
                     </TableCell>
                     <TableCell className="text-xs py-2 text-right">
                       {purchase.quantity} {purchase.unit}
