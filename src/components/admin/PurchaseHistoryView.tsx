@@ -27,13 +27,17 @@ import {
 } from '@/components/ui/table';
 import { Plus, Trash2, Search, DollarSign, Package } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
 
 interface InventoryItem {
   id: string;
   name: string;
   category: string | null;
   unit: string | null;
+}
+
+interface InventoryCategory {
+  id: string;
+  name: string;
 }
 
 interface Purchase {
@@ -57,6 +61,7 @@ interface PurchaseHistoryViewProps {
 const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) => {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryCategories, setInventoryCategories] = useState<InventoryCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -70,12 +75,21 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
   const [showNotes, setShowNotes] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
+  
+  const getTodayDateString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [formData, setFormData] = useState({
     category: '',
     quantity: '',
     unit: 'kg',
     total_cost: '',
-    purchase_date: format(new Date(), 'yyyy-MM-dd'),
+    purchase_date: getTodayDateString(),
     notes: '',
   });
 
@@ -83,6 +97,7 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
     loadPurchases();
     loadInventoryItems();
     loadKnownStores();
+    loadInventoryCategories();
   }, []);
 
   useEffect(() => {
@@ -132,6 +147,17 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
       console.error('Error loading inventory items:', error);
     } else {
       setInventoryItems(data || []);
+    }
+  };
+
+  const loadInventoryCategories = async () => {
+    const { data, error } = await supabase
+      .from('inventory_categories')
+      .select('id, name')
+      .order('display_order');
+
+    if (!error && data) {
+      setInventoryCategories(data);
     }
   };
 
@@ -310,7 +336,7 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
       quantity: '',
       unit: 'kg',
       total_cost: '',
-      purchase_date: format(new Date(), 'yyyy-MM-dd'),
+      purchase_date: getTodayDateString(),
       notes: '',
     });
     setItemSearch('');
@@ -432,13 +458,20 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
               </div>
               <div>
                 <Label className="text-xs">Category</Label>
-                <Input
+                <Select
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  placeholder="e.g., Ingredients"
-                  className="h-7 text-xs"
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
                   disabled={!!selectedItem && !isNewItem}
-                />
+                >
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {inventoryCategories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -465,19 +498,22 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
               </div>
               <div>
                 <Label className="text-xs">Unit</Label>
-                <Select
-                  value={formData.unit}
-                  onValueChange={(value) => setFormData({ ...formData, unit: value })}
-                >
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="kg">kg</SelectItem>
-                    <SelectItem value="g">g</SelectItem>
-                    <SelectItem value="pc">pc</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex h-7 rounded-md border border-input overflow-hidden">
+                  {['kg', 'g', 'pc'].map((unit) => (
+                    <button
+                      key={unit}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, unit })}
+                      className={`flex-1 text-xs font-medium transition-colors ${
+                        formData.unit === unit
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-background hover:bg-accent'
+                      }`}
+                    >
+                      {unit}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <Label className="text-xs">Cost ($) *</Label>
@@ -628,7 +664,7 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
                 filteredPurchases.map((purchase) => (
                   <TableRow key={purchase.id}>
                     <TableCell className="text-xs py-2">
-                      {format(new Date(purchase.purchase_date), 'MMM d, yy')}
+                      {new Date(purchase.purchase_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
                     </TableCell>
                     <TableCell className="text-xs py-2 font-medium">
                       {purchase.inventory?.name || 'Unknown'}
