@@ -56,15 +56,27 @@ interface Purchase {
 
 interface PurchaseHistoryViewProps {
   onPurchaseChanged: () => void;
+  showAddDialog?: boolean;
+  onShowAddDialogChange?: (show: boolean) => void;
 }
 
-const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) => {
+const PurchaseHistoryView = ({ onPurchaseChanged, showAddDialog: externalShowAddDialog, onShowAddDialogChange }: PurchaseHistoryViewProps) => {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [inventoryCategories, setInventoryCategories] = useState<InventoryCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [internalShowAddDialog, setInternalShowAddDialog] = useState(false);
+  
+  // Use external state if provided, otherwise use internal state
+  const showAddDialog = externalShowAddDialog !== undefined ? externalShowAddDialog : internalShowAddDialog;
+  const setShowAddDialog = (show: boolean) => {
+    if (onShowAddDialogChange) {
+      onShowAddDialogChange(show);
+    } else {
+      setInternalShowAddDialog(show);
+    }
+  };
   const [itemSearch, setItemSearch] = useState('');
   const [showItemDropdown, setShowItemDropdown] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -356,45 +368,6 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
 
   return (
     <div className="space-y-4">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card className="py-3">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-            <CardTitle className="text-xs font-medium">Total Purchases</CardTitle>
-            <Package className="h-3 w-3 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="pb-0 px-4">
-            <div className="text-xl font-bold">{purchases.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="py-3">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-            <CardTitle className="text-xs font-medium">Total Spent</CardTitle>
-            <DollarSign className="h-3 w-3 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="pb-0 px-4">
-            <div className="text-xl font-bold">${totalSpent.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="py-3">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-            <CardTitle className="text-xs font-medium">Unique Items</CardTitle>
-          </CardHeader>
-          <CardContent className="pb-0 px-4">
-            <div className="text-xl font-bold">
-              {new Set(purchases.map(p => p.inventory_item_id)).size}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Add Purchase Button */}
-      <Button onClick={() => setShowAddDialog(true)} size="sm">
-        <Plus className="w-4 h-4 mr-1" />
-        Record Purchase
-      </Button>
 
       {/* Add Purchase Dialog */}
       <Dialog open={showAddDialog} onOpenChange={(open) => {
