@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -47,11 +52,13 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
+  const [showItemDropdown, setShowItemDropdown] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [isNewItem, setIsNewItem] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState<string>('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
-    itemName: '',
     category: '',
     quantity: 1,
     unit: 'units',
@@ -64,6 +71,16 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
   useEffect(() => {
     loadPurchases();
     loadInventoryItems();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowItemDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const loadPurchases = async () => {
@@ -103,25 +120,58 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
     }
   };
 
+  const filteredInventoryItems = inventoryItems.filter(item =>
+    item.name.toLowerCase().includes(itemSearch.toLowerCase())
+  );
+
+  const exactMatch = inventoryItems.find(
+    item => item.name.toLowerCase() === itemSearch.toLowerCase()
+  );
+
+  const handleItemSearchChange = (value: string) => {
+    setItemSearch(value);
+    setShowItemDropdown(true);
+    setSelectedItem(null);
+    setIsNewItem(false);
+  };
+
+  const handleSelectItem = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setItemSearch(item.name);
+    setIsNewItem(false);
+    setShowItemDropdown(false);
+    setFormData(prev => ({
+      ...prev,
+      unit: item.unit || 'units',
+      category: item.category || '',
+    }));
+  };
+
+  const handleCreateNewItem = () => {
+    setIsNewItem(true);
+    setSelectedItem(null);
+    setShowItemDropdown(false);
+  };
+
   const handleAddPurchase = async () => {
+    if (!itemSearch.trim()) {
+      toast({ title: 'Item name is required', variant: 'destructive' });
+      return;
+    }
+
     if (formData.quantity <= 0) {
       toast({ title: 'Quantity must be greater than 0', variant: 'destructive' });
       return;
     }
 
-    let itemId = selectedItemId;
+    let itemId: string;
 
-    // If creating a new item
-    if (isNewItem) {
-      if (!formData.itemName.trim()) {
-        toast({ title: 'Item name is required', variant: 'destructive' });
-        return;
-      }
-
+    if (isNewItem || (!selectedItem && !exactMatch)) {
+      // Create new item
       const { data: newItem, error: createError } = await supabase
         .from('inventory')
         .insert({
-          name: formData.itemName.trim(),
+          name: itemSearch.trim(),
           category: formData.category || null,
           quantity: formData.quantity,
           unit: formData.unit,
@@ -134,12 +184,27 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
         toast({ title: 'Error creating item', description: createError.message, variant: 'destructive' });
         return;
       }
-
       itemId = newItem.id;
     } else {
+      // Use existing item
+      itemId = selectedItem?.id || exactMatch?.id || '';
       if (!itemId) {
         toast({ title: 'Please select an item', variant: 'destructive' });
         return;
+      }
+
+      // Update inventory quantity
+      const { data: currentItem } = await supabase
+        .from('inventory')
+        .select('quantity')
+        .eq('id', itemId)
+        .single();
+
+      if (currentItem) {
+        await supabase
+          .from('inventory')
+          .update({ quantity: currentItem.quantity + formData.quantity })
+          .eq('id', itemId);
       }
     }
 
@@ -163,30 +228,8 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
       return;
     }
 
-    // Update inventory quantity and blended cost if not new item
-    if (!isNewItem) {
-      const { data: currentItem } = await supabase
-        .from('inventory')
-        .select('quantity')
-        .eq('id', itemId)
-        .single();
-
-      if (currentItem) {
-        const { error: updateError } = await supabase
-          .from('inventory')
-          .update({ 
-            quantity: currentItem.quantity + formData.quantity
-          })
-          .eq('id', itemId);
-
-        if (updateError) {
-          console.error('Error updating inventory quantity:', updateError);
-        }
-      }
-    }
-
-    toast({ title: 'Purchase recorded successfully' });
-    setShowAddForm(false);
+    toast({ title: 'Purchase recorded' });
+    setShowAddDialog(false);
     resetForm();
     loadPurchases();
     loadInventoryItems();
@@ -194,7 +237,7 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
   };
 
   const handleDeletePurchase = async (purchaseId: string) => {
-    if (!confirm('Are you sure you want to delete this purchase record?')) return;
+    if (!confirm('Delete this purchase record?')) return;
 
     const { error } = await supabase
       .from('inventory_purchases')
@@ -213,7 +256,6 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
 
   const resetForm = () => {
     setFormData({
-      itemName: '',
       category: '',
       quantity: 1,
       unit: 'units',
@@ -222,20 +264,9 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
       purchase_date: format(new Date(), 'yyyy-MM-dd'),
       notes: '',
     });
-    setSelectedItemId('');
+    setItemSearch('');
+    setSelectedItem(null);
     setIsNewItem(false);
-  };
-
-  const handleItemSelect = (itemId: string) => {
-    setSelectedItemId(itemId);
-    const item = inventoryItems.find(i => i.id === itemId);
-    if (item) {
-      setFormData(prev => ({
-        ...prev,
-        unit: item.unit || 'units',
-        category: item.category || '',
-      }));
-    }
   };
 
   const filteredPurchases = purchases.filter(p => 
@@ -245,211 +276,223 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
   );
 
   const totalSpent = purchases.reduce((sum, p) => sum + p.total_cost, 0);
-  const uniqueCategories = [...new Set(inventoryItems.map(item => item.category).filter(Boolean))];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="py-3">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+            <CardTitle className="text-xs font-medium">Total Purchases</CardTitle>
+            <Package className="h-3 w-3 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{purchases.length}</div>
+          <CardContent className="pb-0 px-4">
+            <div className="text-xl font-bold">{purchases.length}</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+        <Card className="py-3">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+            <CardTitle className="text-xs font-medium">Total Spent</CardTitle>
+            <DollarSign className="h-3 w-3 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalSpent.toFixed(2)}</div>
+          <CardContent className="pb-0 px-4">
+            <div className="text-xl font-bold">${totalSpent.toFixed(2)}</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unique Items</CardTitle>
+        <Card className="py-3">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+            <CardTitle className="text-xs font-medium">Unique Items</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="pb-0 px-4">
+            <div className="text-xl font-bold">
               {new Set(purchases.map(p => p.inventory_item_id)).size}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Add Purchase Form */}
-      {showAddForm ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Record New Purchase</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Item Selection */}
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={!isNewItem ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setIsNewItem(false)}
-                >
-                  Existing Item
-                </Button>
-                <Button
-                  type="button"
-                  variant={isNewItem ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setIsNewItem(true)}
-                >
-                  New Item
-                </Button>
-              </div>
+      {/* Add Purchase Button */}
+      <Button onClick={() => setShowAddDialog(true)} size="sm">
+        <Plus className="w-4 h-4 mr-1" />
+        Record Purchase
+      </Button>
 
-              {isNewItem ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="item-name">Item Name *</Label>
-                    <Input
-                      id="item-name"
-                      value={formData.itemName}
-                      onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
-                      placeholder="Enter item name"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="item-category">Category</Label>
-                    <Input
-                      id="item-category"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="e.g., Ingredients, Packaging"
-                      list="categories-list"
-                    />
-                    <datalist id="categories-list">
-                      {uniqueCategories.map(cat => (
-                        <option key={cat} value={cat || ''} />
+      {/* Add Purchase Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={(open) => {
+        setShowAddDialog(open);
+        if (!open) resetForm();
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-base">Record Purchase</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {/* Item Search */}
+            <div className="relative" ref={dropdownRef}>
+              <Label className="text-xs">Item Name *</Label>
+              <Input
+                value={itemSearch}
+                onChange={(e) => handleItemSearchChange(e.target.value)}
+                onFocus={() => setShowItemDropdown(true)}
+                placeholder="Search or enter new item..."
+                className="h-8 text-sm"
+              />
+              {showItemDropdown && itemSearch && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-auto">
+                  {filteredInventoryItems.length > 0 ? (
+                    <>
+                      {filteredInventoryItems.slice(0, 5).map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleSelectItem(item)}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex justify-between items-center"
+                        >
+                          <span>{item.name}</span>
+                          {item.category && (
+                            <span className="text-xs text-muted-foreground">{item.category}</span>
+                          )}
+                        </button>
                       ))}
-                    </datalist>
-                  </div>
+                      {!exactMatch && (
+                        <button
+                          type="button"
+                          onClick={handleCreateNewItem}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent border-t text-primary font-medium"
+                        >
+                          + Create "{itemSearch}"
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleCreateNewItem}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-accent text-primary font-medium"
+                    >
+                      + Create "{itemSearch}"
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <div>
-                  <Label htmlFor="select-item">Select Item *</Label>
-                  <select
-                    id="select-item"
-                    value={selectedItemId}
-                    onChange={(e) => handleItemSelect(e.target.value)}
-                    className="w-full h-10 px-3 py-2 border rounded-md bg-background text-foreground"
-                  >
-                    <option value="">Select an item...</option>
-                    {inventoryItems.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} {item.category ? `(${item.category})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              )}
+              {(selectedItem || isNewItem) && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isNewItem ? '✨ New item will be created' : `✓ Adding to: ${selectedItem?.name}`}
+                </p>
               )}
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Category - only show for new items */}
+            {isNewItem && (
               <div>
-                <Label htmlFor="p-quantity">Quantity *</Label>
+                <Label className="text-xs">Category</Label>
                 <Input
-                  id="p-quantity"
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  placeholder="e.g., Ingredients"
+                  className="h-8 text-sm"
+                />
+              </div>
+            )}
+
+            {/* Quantity and Unit */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Quantity *</Label>
+                <Input
                   type="number"
                   min="0.001"
                   step="any"
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
+                  className="h-8 text-sm"
                 />
               </div>
               <div>
-                <Label htmlFor="p-unit">Unit</Label>
+                <Label className="text-xs">Unit</Label>
                 <Input
-                  id="p-unit"
                   value={formData.unit}
                   onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                  placeholder="units, kg, pcs"
+                  placeholder="kg, pcs"
+                  className="h-8 text-sm"
                 />
               </div>
+            </div>
+
+            {/* Cost and Date */}
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label htmlFor="p-cost">Cost per Unit ($)</Label>
+                <Label className="text-xs">Cost/Unit ($)</Label>
                 <Input
-                  id="p-cost"
                   type="number"
                   step="0.001"
                   min="0"
                   value={formData.cost_per_unit}
                   onChange={(e) => setFormData({ ...formData, cost_per_unit: Number(e.target.value) })}
+                  className="h-8 text-sm"
                 />
               </div>
               <div>
-                <Label htmlFor="p-date">Purchase Date</Label>
+                <Label className="text-xs">Date</Label>
                 <Input
-                  id="p-date"
                   type="date"
                   value={formData.purchase_date}
                   onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
+                  className="h-8 text-sm"
                 />
               </div>
             </div>
+
+            {/* Supplier */}
             <div>
-              <Label htmlFor="p-supplier">Supplier</Label>
+              <Label className="text-xs">Supplier</Label>
               <Input
-                id="p-supplier"
                 value={formData.supplier}
                 onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
                 placeholder="Supplier name"
+                className="h-8 text-sm"
               />
             </div>
+
+            {/* Notes */}
             <div>
-              <Label htmlFor="p-notes">Notes</Label>
-              <Textarea
-                id="p-notes"
+              <Label className="text-xs">Notes</Label>
+              <Input
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Additional notes"
-                rows={2}
+                placeholder="Optional notes"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
+
+            {/* Total and Actions */}
+            <div className="flex items-center justify-between pt-2 border-t">
+              <span className="text-sm">
                 Total: <span className="font-bold">${(formData.quantity * formData.cost_per_unit).toFixed(2)}</span>
-              </div>
+              </span>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => { setShowAddForm(false); resetForm(); }}>
+                <Button variant="outline" size="sm" onClick={() => setShowAddDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleAddPurchase}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Record Purchase
+                <Button size="sm" onClick={handleAddPurchase}>
+                  Save
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Button onClick={() => setShowAddForm(true)} className="w-full">
-          <Plus className="w-4 h-4 mr-2" />
-          Record New Purchase
-        </Button>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by item name, supplier, or category..."
+          placeholder="Search purchases..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
+          className="pl-10 h-9"
         />
       </div>
 
@@ -459,58 +502,59 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Item</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Cost/Unit</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-xs">Date</TableHead>
+                <TableHead className="text-xs">Item</TableHead>
+                <TableHead className="text-xs">Category</TableHead>
+                <TableHead className="text-xs text-right">Qty</TableHead>
+                <TableHead className="text-xs text-right">$/Unit</TableHead>
+                <TableHead className="text-xs text-right">Total</TableHead>
+                <TableHead className="text-xs">Supplier</TableHead>
+                <TableHead className="text-xs text-right w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-6 text-muted-foreground text-sm">
                     Loading...
                   </TableCell>
                 </TableRow>
               ) : filteredPurchases.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    {searchQuery ? 'No purchases match your search' : 'No purchase history yet'}
+                  <TableCell colSpan={8} className="text-center py-6 text-muted-foreground text-sm">
+                    {searchQuery ? 'No matches' : 'No purchases yet'}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredPurchases.map((purchase) => (
                   <TableRow key={purchase.id}>
-                    <TableCell>
-                      {format(new Date(purchase.purchase_date), 'MMM d, yyyy')}
+                    <TableCell className="text-xs py-2">
+                      {format(new Date(purchase.purchase_date), 'MMM d, yy')}
                     </TableCell>
-                    <TableCell className="font-medium">
-                      {purchase.inventory?.name || 'Unknown Item'}
+                    <TableCell className="text-xs py-2 font-medium">
+                      {purchase.inventory?.name || 'Unknown'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs py-2">
                       {purchase.inventory?.category || '-'}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-xs py-2 text-right">
                       {purchase.quantity} {purchase.unit}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-xs py-2 text-right">
                       ${purchase.cost_per_unit.toFixed(3)}
                     </TableCell>
-                    <TableCell className="text-right font-medium">
+                    <TableCell className="text-xs py-2 text-right font-medium">
                       ${purchase.total_cost.toFixed(2)}
                     </TableCell>
-                    <TableCell>{purchase.supplier || '-'}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-xs py-2">{purchase.supplier || '-'}</TableCell>
+                    <TableCell className="text-right py-2">
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-6 w-6"
                         onClick={() => handleDeletePurchase(purchase.id)}
                       >
-                        <Trash2 className="w-4 h-4 text-destructive" />
+                        <Trash2 className="w-3 h-3 text-destructive" />
                       </Button>
                     </TableCell>
                   </TableRow>
