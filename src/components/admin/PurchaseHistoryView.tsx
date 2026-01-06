@@ -11,6 +11,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -57,13 +64,17 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
   const [showItemDropdown, setShowItemDropdown] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [isNewItem, setIsNewItem] = useState(false);
+  const [storeSearch, setStoreSearch] = useState('');
+  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+  const [knownStores, setKnownStores] = useState<string[]>([]);
+  const [showNotes, setShowNotes] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const storeDropdownRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     category: '',
-    quantity: 1,
-    unit: 'units',
-    cost_per_unit: 0,
-    supplier: '',
+    quantity: '',
+    unit: 'kg',
+    total_cost: '',
     purchase_date: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   });
@@ -71,12 +82,16 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
   useEffect(() => {
     loadPurchases();
     loadInventoryItems();
+    loadKnownStores();
   }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowItemDropdown(false);
+      }
+      if (storeDropdownRef.current && !storeDropdownRef.current.contains(event.target as Node)) {
+        setShowStoreDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -120,12 +135,28 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
     }
   };
 
+  const loadKnownStores = async () => {
+    const { data, error } = await supabase
+      .from('inventory_purchases')
+      .select('supplier')
+      .not('supplier', 'is', null);
+
+    if (!error && data) {
+      const uniqueStores = [...new Set(data.map(p => p.supplier).filter(Boolean))] as string[];
+      setKnownStores(uniqueStores.sort());
+    }
+  };
+
   const filteredInventoryItems = inventoryItems.filter(item =>
     item.name.toLowerCase().includes(itemSearch.toLowerCase())
   );
 
   const exactMatch = inventoryItems.find(
     item => item.name.toLowerCase() === itemSearch.toLowerCase()
+  );
+
+  const filteredStores = knownStores.filter(store =>
+    store.toLowerCase().includes(storeSearch.toLowerCase())
   );
 
   const handleItemSearchChange = (value: string) => {
@@ -142,7 +173,7 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
     setShowItemDropdown(false);
     setFormData(prev => ({
       ...prev,
-      unit: item.unit || 'units',
+      unit: item.unit || 'kg',
       category: item.category || '',
     }));
   };
@@ -153,16 +184,36 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
     setShowItemDropdown(false);
   };
 
+  const handleStoreSearchChange = (value: string) => {
+    setStoreSearch(value);
+    setShowStoreDropdown(true);
+  };
+
+  const handleSelectStore = (store: string) => {
+    setStoreSearch(store);
+    setShowStoreDropdown(false);
+  };
+
   const handleAddPurchase = async () => {
     if (!itemSearch.trim()) {
       toast({ title: 'Item name is required', variant: 'destructive' });
       return;
     }
 
-    if (formData.quantity <= 0) {
+    const quantity = parseFloat(formData.quantity);
+    const totalCost = parseFloat(formData.total_cost);
+
+    if (!quantity || quantity <= 0) {
       toast({ title: 'Quantity must be greater than 0', variant: 'destructive' });
       return;
     }
+
+    if (!totalCost || totalCost < 0) {
+      toast({ title: 'Please enter a valid cost', variant: 'destructive' });
+      return;
+    }
+
+    const costPerUnit = totalCost / quantity;
 
     let itemId: string;
 
@@ -173,9 +224,9 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
         .insert({
           name: itemSearch.trim(),
           category: formData.category || null,
-          quantity: formData.quantity,
+          quantity: quantity,
           unit: formData.unit,
-          cost_per_unit: formData.cost_per_unit,
+          cost_per_unit: costPerUnit,
         })
         .select()
         .single();
@@ -203,22 +254,20 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
       if (currentItem) {
         await supabase
           .from('inventory')
-          .update({ quantity: currentItem.quantity + formData.quantity })
+          .update({ quantity: currentItem.quantity + quantity })
           .eq('id', itemId);
       }
     }
-
-    const total_cost = formData.quantity * formData.cost_per_unit;
 
     const { error } = await supabase
       .from('inventory_purchases')
       .insert({
         inventory_item_id: itemId,
-        quantity: formData.quantity,
-        unit: formData.unit || 'units',
-        cost_per_unit: formData.cost_per_unit,
-        total_cost,
-        supplier: formData.supplier || null,
+        quantity: quantity,
+        unit: formData.unit || 'kg',
+        cost_per_unit: costPerUnit,
+        total_cost: totalCost,
+        supplier: storeSearch || null,
         purchase_date: formData.purchase_date,
         notes: formData.notes || null,
       });
@@ -233,6 +282,7 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
     resetForm();
     loadPurchases();
     loadInventoryItems();
+    loadKnownStores();
     onPurchaseChanged();
   };
 
@@ -257,16 +307,17 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
   const resetForm = () => {
     setFormData({
       category: '',
-      quantity: 1,
-      unit: 'units',
-      cost_per_unit: 0,
-      supplier: '',
+      quantity: '',
+      unit: 'kg',
+      total_cost: '',
       purchase_date: format(new Date(), 'yyyy-MM-dd'),
       notes: '',
     });
     setItemSearch('');
     setSelectedItem(null);
     setIsNewItem(false);
+    setStoreSearch('');
+    setShowNotes(false);
   };
 
   const filteredPurchases = purchases.filter(p => 
@@ -324,81 +375,82 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
         setShowAddDialog(open);
         if (!open) resetForm();
       }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-base">Record Purchase</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            {/* Item Search */}
-            <div className="relative" ref={dropdownRef}>
-              <Label className="text-xs">Item Name *</Label>
-              <Input
-                value={itemSearch}
-                onChange={(e) => handleItemSearchChange(e.target.value)}
-                onFocus={() => setShowItemDropdown(true)}
-                placeholder="Search or enter new item..."
-                className="h-8 text-sm"
-              />
-              {showItemDropdown && itemSearch && (
-                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-auto">
-                  {filteredInventoryItems.length > 0 ? (
-                    <>
-                      {filteredInventoryItems.slice(0, 5).map(item => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleSelectItem(item)}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex justify-between items-center"
-                        >
-                          <span>{item.name}</span>
-                          {item.category && (
-                            <span className="text-xs text-muted-foreground">{item.category}</span>
-                          )}
-                        </button>
-                      ))}
-                      {!exactMatch && (
-                        <button
-                          type="button"
-                          onClick={handleCreateNewItem}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent border-t text-primary font-medium"
-                        >
-                          + Create "{itemSearch}"
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleCreateNewItem}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-accent text-primary font-medium"
-                    >
-                      + Create "{itemSearch}"
-                    </button>
-                  )}
-                </div>
-              )}
-              {(selectedItem || isNewItem) && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isNewItem ? '✨ New item will be created' : `✓ Adding to: ${selectedItem?.name}`}
-                </p>
-              )}
-            </div>
-
-            {/* Category - only show for new items */}
-            {isNewItem && (
+          <div className="space-y-2">
+            {/* Item Name and Category on same line */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative" ref={dropdownRef}>
+                <Label className="text-xs">Item Name *</Label>
+                <Input
+                  value={itemSearch}
+                  onChange={(e) => handleItemSearchChange(e.target.value)}
+                  onFocus={() => setShowItemDropdown(true)}
+                  placeholder="Search or new..."
+                  className="h-7 text-xs"
+                />
+                {showItemDropdown && itemSearch && (
+                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-auto">
+                    {filteredInventoryItems.length > 0 ? (
+                      <>
+                        {filteredInventoryItems.slice(0, 5).map(item => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleSelectItem(item)}
+                            className="w-full px-2 py-1.5 text-left text-xs hover:bg-accent flex justify-between items-center"
+                          >
+                            <span>{item.name}</span>
+                            {item.category && (
+                              <span className="text-xs text-muted-foreground">{item.category}</span>
+                            )}
+                          </button>
+                        ))}
+                        {!exactMatch && (
+                          <button
+                            type="button"
+                            onClick={handleCreateNewItem}
+                            className="w-full px-2 py-1.5 text-left text-xs hover:bg-accent border-t text-primary font-medium"
+                          >
+                            + Create "{itemSearch}"
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleCreateNewItem}
+                        className="w-full px-2 py-1.5 text-left text-xs hover:bg-accent text-primary font-medium"
+                      >
+                        + Create "{itemSearch}"
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               <div>
                 <Label className="text-xs">Category</Label>
                 <Input
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   placeholder="e.g., Ingredients"
-                  className="h-8 text-sm"
+                  className="h-7 text-xs"
+                  disabled={!!selectedItem && !isNewItem}
                 />
               </div>
+            </div>
+
+            {/* Status message */}
+            {(selectedItem || isNewItem) && (
+              <p className="text-xs text-muted-foreground">
+                {isNewItem ? '✨ New item will be created' : `✓ Adding to: ${selectedItem?.name}`}
+              </p>
             )}
 
-            {/* Quantity and Unit */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* Quantity, Unit, Cost on same line */}
+            <div className="grid grid-cols-3 gap-2">
               <div>
                 <Label className="text-xs">Quantity *</Label>
                 <Input
@@ -406,77 +458,124 @@ const PurchaseHistoryView = ({ onPurchaseChanged }: PurchaseHistoryViewProps) =>
                   min="0.001"
                   step="any"
                   value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
-                  className="h-8 text-sm"
+                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  placeholder="0"
+                  className="h-7 text-xs"
                 />
               </div>
               <div>
                 <Label className="text-xs">Unit</Label>
-                <Input
+                <Select
                   value={formData.unit}
-                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                  placeholder="kg, pcs"
-                  className="h-8 text-sm"
+                  onValueChange={(value) => setFormData({ ...formData, unit: value })}
+                >
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kg">kg</SelectItem>
+                    <SelectItem value="g">g</SelectItem>
+                    <SelectItem value="pc">pc</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Cost ($) *</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.total_cost}
+                  onChange={(e) => setFormData({ ...formData, total_cost: e.target.value })}
+                  placeholder="0.00"
+                  className="h-7 text-xs"
                 />
               </div>
             </div>
 
-            {/* Cost and Date */}
+            {/* Date and Store on same line */}
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Cost/Unit ($)</Label>
-                <Input
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={formData.cost_per_unit}
-                  onChange={(e) => setFormData({ ...formData, cost_per_unit: Number(e.target.value) })}
-                  className="h-8 text-sm"
-                />
-              </div>
               <div>
                 <Label className="text-xs">Date</Label>
                 <Input
                   type="date"
                   value={formData.purchase_date}
                   onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
-                  className="h-8 text-sm"
+                  className="h-7 text-xs"
                 />
+              </div>
+              <div className="relative" ref={storeDropdownRef}>
+                <Label className="text-xs">Store</Label>
+                <Input
+                  value={storeSearch}
+                  onChange={(e) => handleStoreSearchChange(e.target.value)}
+                  onFocus={() => setShowStoreDropdown(true)}
+                  placeholder="Store name"
+                  className="h-7 text-xs"
+                />
+                {showStoreDropdown && (storeSearch || knownStores.length > 0) && (
+                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-32 overflow-auto">
+                    {filteredStores.length > 0 ? (
+                      filteredStores.slice(0, 5).map(store => (
+                        <button
+                          key={store}
+                          type="button"
+                          onClick={() => handleSelectStore(store)}
+                          className="w-full px-2 py-1.5 text-left text-xs hover:bg-accent"
+                        >
+                          {store}
+                        </button>
+                      ))
+                    ) : storeSearch ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowStoreDropdown(false)}
+                        className="w-full px-2 py-1.5 text-left text-xs hover:bg-accent text-primary"
+                      >
+                        Use "{storeSearch}"
+                      </button>
+                    ) : null}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Supplier */}
-            <div>
-              <Label className="text-xs">Supplier</Label>
-              <Input
-                value={formData.supplier}
-                onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-                placeholder="Supplier name"
-                className="h-8 text-sm"
-              />
-            </div>
+            {/* Notes - collapsible */}
+            {!showNotes ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowNotes(true)}
+                className="h-6 px-2 text-xs text-muted-foreground"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Add notes
+              </Button>
+            ) : (
+              <div>
+                <Label className="text-xs">Notes</Label>
+                <Input
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Optional notes"
+                  className="h-7 text-xs"
+                />
+              </div>
+            )}
 
-            {/* Notes */}
-            <div>
-              <Label className="text-xs">Notes</Label>
-              <Input
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Optional notes"
-                className="h-8 text-sm"
-              />
-            </div>
-
-            {/* Total and Actions */}
+            {/* Total display and Actions */}
             <div className="flex items-center justify-between pt-2 border-t">
-              <span className="text-sm">
-                Total: <span className="font-bold">${(formData.quantity * formData.cost_per_unit).toFixed(2)}</span>
+              <span className="text-xs text-muted-foreground">
+                {formData.quantity && formData.total_cost ? (
+                  <>Cost/unit: ${(parseFloat(formData.total_cost) / parseFloat(formData.quantity)).toFixed(3)}</>
+                ) : null}
               </span>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setShowAddDialog(false)}>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowAddDialog(false)}>
                   Cancel
                 </Button>
-                <Button size="sm" onClick={handleAddPurchase}>
+                <Button size="sm" className="h-7 text-xs" onClick={handleAddPurchase}>
                   Save
                 </Button>
               </div>
