@@ -56,6 +56,7 @@ const InventoryContent = () => {
   const [selectedItemForHistory, setSelectedItemForHistory] = useState<InventoryItem | null>(null);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [showPurchaseHistory, setShowPurchaseHistory] = useState(false);
+  const [showAddPurchaseDialog, setShowAddPurchaseDialog] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -236,12 +237,22 @@ const InventoryContent = () => {
             <h2 className="text-2xl font-display font-bold text-foreground">Purchase History</h2>
             <p className="text-muted-foreground mt-1">Track and record ingredient purchases</p>
           </div>
-          <Button variant="outline" onClick={() => setShowPurchaseHistory(false)}>
-            <Package className="w-4 h-4 mr-2" />
-            View Inventory
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setShowAddPurchaseDialog(true)}>
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              Record Purchase
+            </Button>
+            <Button variant="outline" onClick={() => setShowPurchaseHistory(false)}>
+              <Package className="w-4 h-4 mr-2" />
+              View Inventory
+            </Button>
+          </div>
         </div>
-        <PurchaseHistoryView onPurchaseChanged={handlePurchaseChanged} />
+        <PurchaseHistoryView 
+          onPurchaseChanged={handlePurchaseChanged} 
+          showAddDialog={showAddPurchaseDialog}
+          onShowAddDialogChange={setShowAddPurchaseDialog}
+        />
       </div>
     );
   }
