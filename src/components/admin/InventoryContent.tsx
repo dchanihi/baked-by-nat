@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Table,
@@ -21,9 +20,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit2, Trash2, Package, AlertTriangle, Search, History } from 'lucide-react';
+import { Edit2, Trash2, Package, AlertTriangle, Search, History, ShoppingCart } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import PurchaseHistoryDialog from './PurchaseHistoryDialog';
+import PurchaseHistoryView from './PurchaseHistoryView';
+
 interface InventoryItem {
   id: string;
   name: string;
@@ -39,13 +40,22 @@ interface InventoryItem {
   updated_at: string;
 }
 
+interface PurchaseSummary {
+  inventory_item_id: string;
+  total_quantity: number;
+  total_cost: number;
+  avg_cost: number;
+}
+
 const InventoryContent = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [purchaseSummaries, setPurchaseSummaries] = useState<Map<string, PurchaseSummary>>(new Map());
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [selectedItemForHistory, setSelectedItemForHistory] = useState<InventoryItem | null>(null);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [showPurchaseHistory, setShowPurchaseHistory] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -60,6 +70,7 @@ const InventoryContent = () => {
 
   useEffect(() => {
     loadItems();
+    loadPurchaseSummaries();
   }, []);
 
   const loadItems = async () => {
@@ -74,6 +85,45 @@ const InventoryContent = () => {
     }
 
     setItems(data || []);
+  };
+
+  const loadPurchaseSummaries = async () => {
+    const { data, error } = await supabase
+      .from('inventory_purchases')
+      .select('inventory_item_id, quantity, total_cost');
+
+    if (error) {
+      console.error('Error loading purchase summaries:', error);
+      return;
+    }
+
+    // Aggregate purchases by item
+    const summaryMap = new Map<string, PurchaseSummary>();
+    (data || []).forEach(purchase => {
+      const existing = summaryMap.get(purchase.inventory_item_id);
+      if (existing) {
+        existing.total_quantity += purchase.quantity;
+        existing.total_cost += purchase.total_cost;
+        existing.avg_cost = existing.total_cost / existing.total_quantity;
+      } else {
+        summaryMap.set(purchase.inventory_item_id, {
+          inventory_item_id: purchase.inventory_item_id,
+          total_quantity: purchase.quantity,
+          total_cost: purchase.total_cost,
+          avg_cost: purchase.total_cost / purchase.quantity,
+        });
+      }
+    });
+
+    setPurchaseSummaries(summaryMap);
+  };
+
+  const getBlendedCostPerUnit = (itemId: string, fallbackCost: number | null): number => {
+    const summary = purchaseSummaries.get(itemId);
+    if (summary && summary.total_quantity > 0) {
+      return summary.avg_cost;
+    }
+    return fallbackCost || 0;
   };
 
   const resetForm = () => {
@@ -135,27 +185,6 @@ const InventoryContent = () => {
       }
 
       toast({ title: 'Item updated successfully' });
-    } else {
-      const { error } = await supabase
-        .from('inventory')
-        .insert({
-          name: formData.name,
-          description: formData.description || null,
-          category: formData.category || null,
-          quantity: formData.quantity,
-          unit: formData.unit,
-          cost_per_unit: formData.cost_per_unit,
-          minimum_stock: formData.minimum_stock,
-          supplier: formData.supplier || null,
-          notes: formData.notes || null,
-        });
-
-      if (error) {
-        toast({ title: 'Error creating item', description: error.message, variant: 'destructive' });
-        return;
-      }
-
-      toast({ title: 'Item added successfully' });
     }
 
     setIsDialogOpen(false);
@@ -177,6 +206,11 @@ const InventoryContent = () => {
     loadItems();
   };
 
+  const handlePurchaseChanged = () => {
+    loadItems();
+    loadPurchaseSummaries();
+  };
+
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -187,11 +221,30 @@ const InventoryContent = () => {
     item.minimum_stock && item.quantity <= item.minimum_stock
   );
 
-  const totalValue = items.reduce((sum, item) => 
-    sum + (item.quantity * (item.cost_per_unit || 0)), 0
-  );
+  const totalValue = items.reduce((sum, item) => {
+    const costPerUnit = getBlendedCostPerUnit(item.id, item.cost_per_unit);
+    return sum + (item.quantity * costPerUnit);
+  }, 0);
 
   const uniqueCategories = [...new Set(items.map(item => item.category).filter(Boolean))];
+
+  if (showPurchaseHistory) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-display font-bold text-foreground">Purchase History</h2>
+            <p className="text-muted-foreground mt-1">Track and record ingredient purchases</p>
+          </div>
+          <Button variant="outline" onClick={() => setShowPurchaseHistory(false)}>
+            <Package className="w-4 h-4 mr-2" />
+            View Inventory
+          </Button>
+        </div>
+        <PurchaseHistoryView onPurchaseChanged={handlePurchaseChanged} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -200,122 +253,122 @@ const InventoryContent = () => {
           <h2 className="text-2xl font-display font-bold text-foreground">Inventory</h2>
           <p className="text-muted-foreground mt-1">Manage your stock and supplies</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          setIsDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Item
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{editingItem ? 'Edit Item' : 'Add New Item'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Item name"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="unit">Unit</Label>
-                  <Input
-                    id="unit"
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    placeholder="units, kg, pcs"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="cost">Cost per Unit ($)</Label>
-                  <Input
-                    id="cost"
-                    type="number"
-                    step="0.01"
-                    value={formData.cost_per_unit}
-                    onChange={(e) => setFormData({ ...formData, cost_per_unit: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="minStock">Minimum Stock</Label>
-                  <Input
-                    id="minStock"
-                    type="number"
-                    value={formData.minimum_stock}
-                    onChange={(e) => setFormData({ ...formData, minimum_stock: Number(e.target.value) })}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Input
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  placeholder="e.g., Ingredients, Packaging"
-                  list="categories"
-                />
-                <datalist id="categories">
-                  {uniqueCategories.map(cat => (
-                    <option key={cat} value={cat || ''} />
-                  ))}
-                </datalist>
-              </div>
-              <div>
-                <Label htmlFor="supplier">Supplier</Label>
-                <Input
-                  id="supplier"
-                  value={formData.supplier}
-                  onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-                  placeholder="Supplier name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Item description"
-                  rows={2}
-                />
-              </div>
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Additional notes"
-                  rows={2}
-                />
-              </div>
-              <Button onClick={handleSubmit} className="w-full">
-                {editingItem ? 'Update Item' : 'Add Item'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setShowPurchaseHistory(true)}>
+          <ShoppingCart className="w-4 h-4 mr-2" />
+          Purchase History
+        </Button>
       </div>
+
+      {/* Edit Item Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open);
+        if (!open) resetForm();
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Item</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="name">Name *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Item name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="unit">Unit</Label>
+                <Input
+                  id="unit"
+                  value={formData.unit}
+                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  placeholder="units, kg, pcs"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="cost">Cost per Unit ($)</Label>
+                <Input
+                  id="cost"
+                  type="number"
+                  step="0.001"
+                  value={formData.cost_per_unit}
+                  onChange={(e) => setFormData({ ...formData, cost_per_unit: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="minStock">Minimum Stock</Label>
+                <Input
+                  id="minStock"
+                  type="number"
+                  value={formData.minimum_stock}
+                  onChange={(e) => setFormData({ ...formData, minimum_stock: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="category">Category</Label>
+              <Input
+                id="category"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                placeholder="e.g., Ingredients, Packaging"
+                list="categories"
+              />
+              <datalist id="categories">
+                {uniqueCategories.map(cat => (
+                  <option key={cat} value={cat || ''} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <Label htmlFor="supplier">Supplier</Label>
+              <Input
+                id="supplier"
+                value={formData.supplier}
+                onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                placeholder="Supplier name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Item description"
+                rows={2}
+              />
+            </div>
+            <div>
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Additional notes"
+                rows={2}
+              />
+            </div>
+            <Button onClick={handleSubmit} className="w-full">
+              Update Item
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -380,9 +433,8 @@ const InventoryContent = () => {
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead className="text-right">Quantity</TableHead>
-                <TableHead className="text-right">Cost/Unit</TableHead>
+                <TableHead className="text-right">Avg Cost/Unit</TableHead>
                 <TableHead className="text-right">Total Value</TableHead>
-                <TableHead>Supplier</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -390,13 +442,14 @@ const InventoryContent = () => {
             <TableBody>
               {filteredItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     {searchQuery ? 'No items match your search' : 'No inventory items yet'}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredItems.map((item) => {
                   const isLowStock = item.minimum_stock && item.quantity <= item.minimum_stock;
+                  const blendedCost = getBlendedCostPerUnit(item.id, item.cost_per_unit);
                   return (
                     <TableRow 
                       key={item.id} 
@@ -424,12 +477,11 @@ const InventoryContent = () => {
                         {item.quantity} {item.unit}
                       </TableCell>
                       <TableCell className="text-right">
-                        ${(item.cost_per_unit || 0).toFixed(2)}
+                        ${blendedCost.toFixed(3)}
                       </TableCell>
                       <TableCell className="text-right">
-                        ${(item.quantity * (item.cost_per_unit || 0)).toFixed(2)}
+                        ${(item.quantity * blendedCost).toFixed(2)}
                       </TableCell>
-                      <TableCell>{item.supplier || '-'}</TableCell>
                       <TableCell>
                         {isLowStock ? (
                           <Badge variant="destructive" className="flex items-center gap-1 w-fit">
@@ -478,7 +530,7 @@ const InventoryContent = () => {
         item={selectedItemForHistory}
         open={historyDialogOpen}
         onOpenChange={setHistoryDialogOpen}
-        onPurchaseAdded={loadItems}
+        onPurchaseAdded={handlePurchaseChanged}
       />
     </div>
   );
