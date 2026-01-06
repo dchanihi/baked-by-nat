@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { AccountSettings } from '@/components/admin/AccountSettings';
 import { CategorySettings } from '@/components/admin/CategorySettings';
+import { InventoryCategorySettings } from '@/components/admin/InventoryCategorySettings';
 import Navigation from '@/components/Navigation';
 
 const Settings = () => {
@@ -99,7 +100,19 @@ const Settings = () => {
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                manage categories
+                bake categories
+              </Button>
+            </Link>
+            <Link to="/admin/settings/inventory-categories">
+              <Button 
+                variant="ghost" 
+                className={`rounded-none border-b-2 ${
+                  currentPage === 'inventory-categories' 
+                    ? 'border-primary text-primary' 
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                inventory categories
               </Button>
             </Link>
           </div>
@@ -107,6 +120,7 @@ const Settings = () => {
           <div className="mt-8">
             {currentPage === 'profile' && <AccountSettings />}
             {currentPage === 'categories' && <CategorySettings />}
+            {currentPage === 'inventory-categories' && <InventoryCategorySettings />}
           </div>
         </div>
       </main>
