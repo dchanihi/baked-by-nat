@@ -253,10 +253,12 @@ const InventoryContent = () => {
           <h2 className="text-2xl font-display font-bold text-foreground">Inventory</h2>
           <p className="text-muted-foreground mt-1">Manage your stock and supplies</p>
         </div>
-        <Button onClick={() => setShowPurchaseHistory(true)}>
-          <ShoppingCart className="w-4 h-4 mr-2" />
-          Purchase History
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowPurchaseHistory(true)}>
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            Record Purchase
+          </Button>
+        </div>
       </div>
 
       {/* Edit Item Dialog */}
