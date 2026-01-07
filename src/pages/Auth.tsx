@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,21 +11,45 @@ import { Heart } from 'lucide-react';
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [resetEmail, setResetEmail] = useState('');
   const [showResetForm, setShowResetForm] = useState(false);
+  const [showUpdatePassword, setShowUpdatePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
-    // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    // Check URL params for reset flow
+    const isReset = searchParams.get('reset') === 'true';
+    
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // User clicked password reset link and is now in recovery mode
+        setShowUpdatePassword(true);
+        setShowResetForm(false);
+      } else if (event === 'SIGNED_IN' && !isReset) {
+        // Normal sign in - redirect to admin
         navigate('/admin');
       }
     });
-  }, [navigate]);
+
+    // Check if user is already logged in (but not in reset mode)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && !isReset) {
+        navigate('/admin');
+      } else if (session && isReset) {
+        // User has a session from clicking reset link
+        setShowUpdatePassword(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate, searchParams]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,6 +130,53 @@ const Auth = () => {
     setLoading(false);
   };
 
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: 'Error',
+        description: 'Passwords do not match.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: 'Error',
+        description: 'Password must be at least 6 characters.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success!',
+        description: 'Your password has been updated.',
+      });
+      setShowUpdatePassword(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      navigate('/admin');
+    }
+
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-secondary p-4">
       <Card className="w-full max-w-md">
@@ -117,7 +188,42 @@ const Auth = () => {
           <CardDescription className="font-body">Admin Portal</CardDescription>
         </CardHeader>
         <CardContent>
-          {showResetForm ? (
+          {showUpdatePassword ? (
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <div className="text-center mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Enter your new password below.
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="Enter new password"
+                />
+              </div>
+              <div>
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="Confirm new password"
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Updating...' : 'Update Password'}
+              </Button>
+            </form>
+          ) : showResetForm ? (
             <form onSubmit={handlePasswordReset} className="space-y-4">
               <div>
                 <Label htmlFor="reset-email">Email</Label>
