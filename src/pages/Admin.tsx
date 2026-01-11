@@ -19,6 +19,7 @@ import { EventStatistics } from '@/components/admin/EventStatistics';
 import IncomeOverview from '@/components/admin/financials/IncomeOverview';
 import ExpensesManager from '@/components/admin/financials/ExpensesManager';
 import InventoryContent from '@/components/admin/InventoryContent';
+import RecipesContent from '@/components/admin/RecipesContent';
 import Navigation from '@/components/Navigation';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -439,13 +440,14 @@ const Admin = () => {
           />
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full max-w-5xl grid-cols-6">
+            <TabsList className="grid w-full max-w-6xl grid-cols-7">
               <TabsTrigger value="overview">order overview</TabsTrigger>
               <TabsTrigger value="orders">view orders</TabsTrigger>
               <TabsTrigger value="bakes">manage bakes</TabsTrigger>
               <TabsTrigger value="events">events</TabsTrigger>
               <TabsTrigger value="financials">financials</TabsTrigger>
               <TabsTrigger value="inventory">inventory</TabsTrigger>
+              <TabsTrigger value="recipes">recipes</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
@@ -502,6 +504,10 @@ const Admin = () => {
 
             <TabsContent value="inventory" className="space-y-6">
               <InventoryContent />
+            </TabsContent>
+
+            <TabsContent value="recipes" className="space-y-6">
+              <RecipesContent />
             </TabsContent>
           </Tabs>
         )}

@@ -12,6 +12,7 @@ import Order from "./pages/Order";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import Settings from "./pages/Settings";
+import Recipes from "./pages/Recipes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
           <Route path="/admin/settings/profile" element={<Settings />} />
           <Route path="/admin/settings/categories" element={<Settings />} />
           <Route path="/admin/settings/inventory-categories" element={<Settings />} />
+          <Route path="/recipes" element={<Recipes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
