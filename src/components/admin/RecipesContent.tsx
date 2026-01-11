@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,8 +28,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Plus, Edit2, Trash2, ChefHat, Search, X, DollarSign, Package } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+
+interface BakeCategory {
+  id: string;
+  name: string;
+}
 
 interface InventoryItem {
   id: string;
@@ -69,6 +75,7 @@ interface TempIngredient {
 const RecipesContent = () => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [bakeCategories, setBakeCategories] = useState<BakeCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
@@ -76,7 +83,7 @@ const RecipesContent = () => {
     name: '',
     description: '',
     yield_quantity: 1,
-    yield_unit: 'units',
+    yield_unit: 'pc',
     category: '',
   });
   const [tempIngredients, setTempIngredients] = useState<TempIngredient[]>([]);
@@ -85,10 +92,14 @@ const RecipesContent = () => {
     quantity: 0,
     unit: 'units',
   });
+  const [categorySearch, setCategorySearch] = useState('');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const categoryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadRecipes();
     loadInventory();
+    loadBakeCategories();
   }, []);
 
   const loadRecipes = async () => {
@@ -134,17 +145,33 @@ const RecipesContent = () => {
     setInventoryItems(data || []);
   };
 
+  const loadBakeCategories = async () => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id, name')
+      .order('display_order');
+
+    if (error) {
+      toast({ title: 'Error loading categories', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    setBakeCategories(data || []);
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
       description: '',
       yield_quantity: 1,
-      yield_unit: 'units',
+      yield_unit: 'pc',
       category: '',
     });
     setTempIngredients([]);
     setNewIngredient({ inventory_item_id: '', quantity: 0, unit: 'units' });
     setEditingRecipe(null);
+    setCategorySearch('');
+    setShowCategoryDropdown(false);
   };
 
   const openEditDialog = async (recipe: Recipe) => {
@@ -153,9 +180,10 @@ const RecipesContent = () => {
       name: recipe.name,
       description: recipe.description || '',
       yield_quantity: recipe.yield_quantity,
-      yield_unit: recipe.yield_unit || 'units',
+      yield_unit: recipe.yield_unit || 'pc',
       category: recipe.category || '',
     });
+    setCategorySearch(recipe.category || '');
 
     // Load existing ingredients
     const { data: ingredientsData } = await supabase
@@ -171,6 +199,19 @@ const RecipesContent = () => {
       }))
     );
     setIsDialogOpen(true);
+  };
+
+  const filteredBakeCategories = useMemo(() => {
+    if (!categorySearch) return bakeCategories;
+    return bakeCategories.filter((cat) =>
+      cat.name.toLowerCase().includes(categorySearch.toLowerCase())
+    );
+  }, [bakeCategories, categorySearch]);
+
+  const handleCategorySelect = (categoryName: string) => {
+    setFormData({ ...formData, category: categoryName });
+    setCategorySearch(categoryName);
+    setShowCategoryDropdown(false);
   };
 
   const addIngredient = () => {
@@ -376,28 +417,58 @@ const RecipesContent = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="yield_unit">Yield Unit</Label>
-                    <Input
-                      id="yield_unit"
+                    <Label>Yield Unit</Label>
+                    <ToggleGroup
+                      type="single"
                       value={formData.yield_unit}
-                      onChange={(e) => setFormData({ ...formData, yield_unit: e.target.value })}
-                      placeholder="cookies, pieces"
-                    />
+                      onValueChange={(value) => {
+                        if (value) setFormData({ ...formData, yield_unit: value });
+                      }}
+                      className="justify-start mt-1"
+                    >
+                      <ToggleGroupItem value="g" aria-label="Grams" className="px-4">
+                        g
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="kg" aria-label="Kilograms" className="px-4">
+                        kg
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="pc" aria-label="Pieces" className="px-4">
+                        pc
+                      </ToggleGroupItem>
+                    </ToggleGroup>
                   </div>
-                  <div>
+                  <div className="relative">
                     <Label htmlFor="category">Category</Label>
                     <Input
+                      ref={categoryInputRef}
                       id="category"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="e.g., Cookies"
-                      list="recipe-categories"
+                      value={categorySearch}
+                      onChange={(e) => {
+                        setCategorySearch(e.target.value);
+                        setFormData({ ...formData, category: e.target.value });
+                        setShowCategoryDropdown(true);
+                      }}
+                      onFocus={() => setShowCategoryDropdown(true)}
+                      onBlur={() => {
+                        // Delay to allow click on dropdown items
+                        setTimeout(() => setShowCategoryDropdown(false), 150);
+                      }}
+                      placeholder="Search categories..."
                     />
-                    <datalist id="recipe-categories">
-                      {uniqueCategories.map((cat) => (
-                        <option key={cat} value={cat || ''} />
-                      ))}
-                    </datalist>
+                    {showCategoryDropdown && filteredBakeCategories.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {filteredBakeCategories.map((cat) => (
+                          <div
+                            key={cat.id}
+                            className="px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleCategorySelect(cat.name)}
+                          >
+                            {cat.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
