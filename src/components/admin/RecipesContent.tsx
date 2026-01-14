@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Plus, Edit2, Trash2, ChefHat, Search, X, DollarSign, Package } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChefHat, Search, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface BakeCategory {
@@ -363,9 +363,13 @@ const RecipesContent = () => {
     );
   }, [recipes, searchQuery]);
 
-  const uniqueCategories = [...new Set(recipes.map((r) => r.category).filter(Boolean))];
-  const totalRecipes = recipes.length;
-  const totalIngredients = recipes.reduce((sum, r) => sum + (r.ingredients?.length || 0), 0);
+  const mostPopularRecipe = useMemo(() => {
+    if (recipes.length === 0) return null;
+    // Find recipe with most ingredients as a proxy for complexity/popularity
+    return recipes.reduce((prev, curr) => 
+      (curr.ingredients?.length || 0) > (prev.ingredients?.length || 0) ? curr : prev
+    , recipes[0]);
+  }, [recipes]);
 
   return (
     <div className="space-y-6">
@@ -593,54 +597,25 @@ const RecipesContent = () => {
         </Dialog>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Recipes</CardTitle>
-            <ChefHat className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalRecipes}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Categories</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{uniqueCategories.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Ingredients Used</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalIngredients}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Cost/Recipe</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              $
-              {totalRecipes > 0
-                ? (recipes.reduce((sum, r) => sum + calculateRecipeCost(r), 0) / totalRecipes).toFixed(2)
-                : '0.00'}
+      {/* Summary Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Most Popular Recipe</CardTitle>
+          <ChefHat className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          {mostPopularRecipe ? (
+            <div>
+              <div className="text-2xl font-bold">{mostPopularRecipe.name}</div>
+              <p className="text-xs text-muted-foreground">
+                {mostPopularRecipe.ingredients?.length || 0} ingredients • ${calculateRecipeCost(mostPopularRecipe).toFixed(2)} cost
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search */}
+          ) : (
+            <div className="text-2xl font-bold text-muted-foreground">No recipes yet</div>
+          )}
+        </CardContent>
+      </Card>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
