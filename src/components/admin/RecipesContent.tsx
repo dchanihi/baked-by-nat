@@ -529,12 +529,20 @@ const RecipesContent = () => {
                       }
                     />
                   </div>
-                  <div className="w-24">
+                  <div>
                     <Label>Unit</Label>
-                    <Input
+                    <ToggleGroup
+                      type="single"
                       value={newIngredient.unit}
-                      onChange={(e) => setNewIngredient({ ...newIngredient, unit: e.target.value })}
-                    />
+                      onValueChange={(value) => {
+                        if (value) setNewIngredient({ ...newIngredient, unit: value });
+                      }}
+                      className="justify-start"
+                    >
+                      <ToggleGroupItem value="g" aria-label="Grams">g</ToggleGroupItem>
+                      <ToggleGroupItem value="kg" aria-label="Kilograms">kg</ToggleGroupItem>
+                      <ToggleGroupItem value="pc" aria-label="Pieces">pc</ToggleGroupItem>
+                    </ToggleGroup>
                   </div>
                   <Button type="button" onClick={addIngredient} size="icon">
                     <Plus className="w-4 h-4" />
