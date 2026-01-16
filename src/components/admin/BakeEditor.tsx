@@ -7,10 +7,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
-import { Upload, Save, X } from 'lucide-react';
+import { Upload, Save, X, DollarSign } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Bake = Tables<'bakes'>;
+
+interface Recipe {
+  id: string;
+  name: string;
+  yield_quantity: number;
+  category: string | null;
+}
 
 interface BakeEditorProps {
   bake: Bake | null;
@@ -24,6 +31,8 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>(bake?.image_url || '');
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipeCost, setRecipeCost] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   const initialFormData = {
@@ -38,13 +47,23 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
       ? new Date(bake.scheduled_publish_date).toISOString().slice(0, 16)
       : '',
     image_position: bake?.image_position || 'center',
+    recipe_id: bake?.recipe_id || '',
   };
   
   const [formData, setFormData] = useState(initialFormData);
 
   useEffect(() => {
     loadCategories();
+    loadRecipes();
   }, []);
+
+  useEffect(() => {
+    if (formData.recipe_id) {
+      calculateRecipeCost(formData.recipe_id);
+    } else {
+      setRecipeCost(null);
+    }
+  }, [formData.recipe_id]);
 
   useEffect(() => {
     const hasChanges = 
@@ -57,6 +76,7 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
       formData.status !== initialFormData.status ||
       formData.scheduled_publish_date !== initialFormData.scheduled_publish_date ||
       formData.image_position !== initialFormData.image_position ||
+      formData.recipe_id !== initialFormData.recipe_id ||
       imageFile !== null;
     
     setHasUnsavedChanges(hasChanges);
@@ -71,6 +91,54 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
     if (data) {
       setCategories(data);
     }
+  };
+
+  const loadRecipes = async () => {
+    const { data } = await supabase
+      .from('recipes')
+      .select('id, name, yield_quantity, category')
+      .order('name');
+    
+    if (data) {
+      setRecipes(data);
+    }
+  };
+
+  const calculateRecipeCost = async (recipeId: string) => {
+    // Get recipe ingredients
+    const { data: ingredients } = await supabase
+      .from('recipe_ingredients')
+      .select('quantity, inventory_item_id')
+      .eq('recipe_id', recipeId);
+
+    if (!ingredients || ingredients.length === 0) {
+      setRecipeCost(0);
+      return;
+    }
+
+    // Get inventory items with costs
+    const itemIds = ingredients.map(i => i.inventory_item_id);
+    const { data: items } = await supabase
+      .from('inventory')
+      .select('id, cost_per_unit')
+      .in('id', itemIds);
+
+    if (!items) {
+      setRecipeCost(0);
+      return;
+    }
+
+    // Calculate total cost
+    const totalCost = ingredients.reduce((sum, ing) => {
+      const item = items.find(i => i.id === ing.inventory_item_id);
+      if (!item || !item.cost_per_unit) return sum;
+      return sum + Number(ing.quantity) * Number(item.cost_per_unit);
+    }, 0);
+
+    // Get yield quantity for cost per unit
+    const recipe = recipes.find(r => r.id === recipeId);
+    const yieldQty = recipe?.yield_quantity || 1;
+    setRecipeCost(totalCost / yieldQty);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,6 +211,7 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
       scheduled_publish_date: formData.scheduled_publish_date || null,
       image_url: imageUrl!,
       image_position: formData.image_position,
+      recipe_id: formData.recipe_id || null,
       created_by: user?.id,
     };
 
@@ -336,6 +405,32 @@ export const BakeEditor = ({ bake, onSave, onCancel }: BakeEditorProps) => {
                   value={formData.scheduled_publish_date}
                   onChange={(e) => setFormData({ ...formData, scheduled_publish_date: e.target.value })}
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="recipe">Linked Recipe (for COGS)</Label>
+                <Select
+                  value={formData.recipe_id}
+                  onValueChange={(value) => setFormData({ ...formData, recipe_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a recipe (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {recipes.map((recipe) => (
+                      <SelectItem key={recipe.id} value={recipe.id}>
+                        {recipe.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {recipeCost !== null && formData.recipe_id && (
+                  <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                    <DollarSign className="w-3 h-3" />
+                    COGS per unit: ${recipeCost.toFixed(2)}
+                  </p>
+                )}
               </div>
             </div>
           </div>
