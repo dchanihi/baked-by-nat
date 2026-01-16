@@ -170,6 +170,11 @@ const PurchaseHistoryView = ({ onPurchaseChanged, showAddDialog: externalShowAdd
 
     if (!error && data) {
       setInventoryCategories(data);
+      // Default to "Ingredients" category if it exists
+      const ingredientsCategory = data.find(cat => cat.name.toLowerCase() === 'ingredients');
+      if (ingredientsCategory) {
+        setFormData(prev => ({ ...prev, category: ingredientsCategory.name }));
+      }
     }
   };
 
@@ -343,8 +348,10 @@ const PurchaseHistoryView = ({ onPurchaseChanged, showAddDialog: externalShowAdd
   };
 
   const resetForm = () => {
+    // Default to "Ingredients" category if it exists
+    const ingredientsCategory = inventoryCategories.find(cat => cat.name.toLowerCase() === 'ingredients');
     setFormData({
-      category: '',
+      category: ingredientsCategory?.name || '',
       quantity: '',
       unit: 'kg',
       total_cost: '',
