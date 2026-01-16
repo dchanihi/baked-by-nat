@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Bake = Tables<'bakes'>;
+type Bake = Tables<'bakes'> & { recipe_id?: string | null };
 type Category = Tables<'categories'> & { icon?: string | null };
 
 interface EventItem {
@@ -489,16 +489,59 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
     }]);
   };
 
-  const addFromBake = (bake: Bake) => {
+  const addFromBake = async (bake: Bake) => {
+    let cogs = 0;
+    
+    // If bake has a linked recipe, calculate COGS from it
+    if (bake.recipe_id) {
+      cogs = await calculateRecipeCogs(bake.recipe_id);
+    }
+    
     setItems([...items, {
       bake_id: bake.id,
       name: bake.title,
-      cogs: 0,
+      cogs,
       price: 0,
       starting_quantity: 0,
       category: bake.category || null,
     }]);
     setShowBakeSelector(false);
+  };
+
+  const calculateRecipeCogs = async (recipeId: string): Promise<number> => {
+    // Get recipe ingredients
+    const { data: ingredients } = await supabase
+      .from('recipe_ingredients')
+      .select('quantity, inventory_item_id')
+      .eq('recipe_id', recipeId);
+
+    if (!ingredients || ingredients.length === 0) return 0;
+
+    // Get inventory items with costs
+    const itemIds = ingredients.map(i => i.inventory_item_id);
+    const { data: items } = await supabase
+      .from('inventory')
+      .select('id, cost_per_unit')
+      .in('id', itemIds);
+
+    if (!items) return 0;
+
+    // Calculate total cost
+    const totalCost = ingredients.reduce((sum, ing) => {
+      const item = items.find(i => i.id === ing.inventory_item_id);
+      if (!item || !item.cost_per_unit) return sum;
+      return sum + Number(ing.quantity) * Number(item.cost_per_unit);
+    }, 0);
+
+    // Get yield quantity for cost per unit
+    const { data: recipe } = await supabase
+      .from('recipes')
+      .select('yield_quantity')
+      .eq('id', recipeId)
+      .single();
+
+    const yieldQty = recipe?.yield_quantity || 1;
+    return totalCost / yieldQty;
   };
 
   const updateItem = (index: number, field: keyof EventItem, value: string | number | null) => {

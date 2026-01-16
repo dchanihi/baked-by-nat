@@ -27,6 +27,7 @@ export type Database = {
           image_url: string
           is_archived: boolean
           is_visible: boolean
+          recipe_id: string | null
           scheduled_publish_date: string | null
           status: string
           tags: string[] | null
@@ -45,6 +46,7 @@ export type Database = {
           image_url: string
           is_archived?: boolean
           is_visible?: boolean
+          recipe_id?: string | null
           scheduled_publish_date?: string | null
           status?: string
           tags?: string[] | null
@@ -63,13 +65,22 @@ export type Database = {
           image_url?: string
           is_archived?: boolean
           is_visible?: boolean
+          recipe_id?: string | null
           scheduled_publish_date?: string | null
           status?: string
           tags?: string[] | null
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bakes_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       categories: {
         Row: {
