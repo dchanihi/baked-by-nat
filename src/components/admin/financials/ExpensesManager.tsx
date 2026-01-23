@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,9 +28,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Edit2, Trash2, FolderPlus, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface ExpensesManagerProps {
   onDataChange?: () => void;
@@ -41,14 +42,6 @@ interface InventoryCategory {
   name: string;
   description: string | null;
   display_order: number;
-}
-
-interface Subcategory {
-  id: string;
-  category_id: string;
-  event_id: string | null;
-  name: string;
-  description: string | null;
 }
 
 interface Expense {
@@ -69,33 +62,22 @@ interface Event {
 
 const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
   const [inventoryCategories, setInventoryCategories] = useState<InventoryCategory[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   
   // Dialog states
-  const [isSubcategoryDialogOpen, setIsSubcategoryDialogOpen] = useState(false);
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   
   // Form states
-  const [subcategoryForm, setSubcategoryForm] = useState({ 
-    category_id: '', 
-    event_id: '', 
-    name: '', 
-    description: '' 
-  });
   const [expenseForm, setExpenseForm] = useState({
     category_id: '',
-    subcategory_id: '',
     name: '',
     amount: 0,
     expense_date: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   });
   
-  const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
   useEffect(() => {
@@ -103,71 +85,13 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
   }, []);
 
   const loadData = async () => {
-    const [inventoryCategoriesRes, subcategoriesRes, expensesRes, eventsRes] = await Promise.all([
+    const [inventoryCategoriesRes, expensesRes] = await Promise.all([
       supabase.from('inventory_categories').select('*').order('display_order'),
-      supabase.from('expense_subcategories').select('*').order('name'),
       supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
-      supabase.from('events').select('id, name').order('start_time', { ascending: false }),
     ]);
 
     if (inventoryCategoriesRes.data) setInventoryCategories(inventoryCategoriesRes.data);
-    if (subcategoriesRes.data) setSubcategories(subcategoriesRes.data);
     if (expensesRes.data) setExpenses(expensesRes.data);
-    if (eventsRes.data) setEvents(eventsRes.data);
-  };
-
-  // Subcategory handlers
-  const handleSaveSubcategory = async () => {
-    if (!subcategoryForm.name.trim() || !subcategoryForm.category_id) {
-      toast({ title: 'Name and category are required', variant: 'destructive' });
-      return;
-    }
-
-    const data = {
-      name: subcategoryForm.name,
-      category_id: subcategoryForm.category_id,
-      event_id: subcategoryForm.event_id || null,
-      description: subcategoryForm.description || null,
-    };
-
-    if (editingSubcategory) {
-      const { error } = await supabase
-        .from('expense_subcategories')
-        .update(data)
-        .eq('id', editingSubcategory.id);
-
-      if (error) {
-        toast({ title: 'Error updating subcategory', description: error.message, variant: 'destructive' });
-        return;
-      }
-      toast({ title: 'Subcategory updated' });
-    } else {
-      const { error } = await supabase.from('expense_subcategories').insert(data);
-      if (error) {
-        toast({ title: 'Error creating subcategory', description: error.message, variant: 'destructive' });
-        return;
-      }
-      toast({ title: 'Subcategory created' });
-    }
-
-    setIsSubcategoryDialogOpen(false);
-    setSubcategoryForm({ category_id: '', event_id: '', name: '', description: '' });
-    setEditingSubcategory(null);
-    loadData();
-    onDataChange?.();
-  };
-
-  const handleDeleteSubcategory = async (id: string) => {
-    if (!confirm('This will unlink expenses from this subcategory. Continue?')) return;
-    
-    const { error } = await supabase.from('expense_subcategories').delete().eq('id', id);
-    if (error) {
-      toast({ title: 'Error deleting subcategory', description: error.message, variant: 'destructive' });
-      return;
-    }
-    toast({ title: 'Subcategory deleted' });
-    loadData();
-    onDataChange?.();
   };
 
   // Expense handlers
@@ -181,7 +105,6 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
       name: expenseForm.name,
       amount: expenseForm.amount,
       category_id: expenseForm.category_id || null,
-      subcategory_id: expenseForm.subcategory_id || null,
       expense_date: expenseForm.expense_date || null,
       notes: expenseForm.notes || null,
     };
@@ -209,7 +132,6 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
     setIsExpenseDialogOpen(false);
     setExpenseForm({
       category_id: '',
-      subcategory_id: '',
       name: '',
       amount: 0,
       expense_date: format(new Date(), 'yyyy-MM-dd'),
@@ -233,22 +155,10 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
     onDataChange?.();
   };
 
-  const openEditSubcategory = (sub: Subcategory) => {
-    setEditingSubcategory(sub);
-    setSubcategoryForm({
-      category_id: sub.category_id,
-      event_id: sub.event_id || '',
-      name: sub.name,
-      description: sub.description || '',
-    });
-    setIsSubcategoryDialogOpen(true);
-  };
-
   const openEditExpense = (exp: Expense) => {
     setEditingExpense(exp);
     setExpenseForm({
       category_id: exp.category_id || '',
-      subcategory_id: exp.subcategory_id || '',
       name: exp.name,
       amount: exp.amount,
       expense_date: exp.expense_date || format(new Date(), 'yyyy-MM-dd'),
@@ -257,13 +167,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
     setIsExpenseDialogOpen(true);
   };
 
-  const getCategoryName = (id: string | null) => inventoryCategories.find(c => c.id === id)?.name || '-';
-  const getSubcategoryName = (id: string | null) => subcategories.find(s => s.id === id)?.name || '-';
-  const getEventName = (id: string | null) => events.find(e => e.id === id)?.name;
-
-  const filteredSubcategories = expenseForm.category_id 
-    ? subcategories.filter(s => s.category_id === expenseForm.category_id)
-    : [];
+  const getCategoryName = (id: string | null) => inventoryCategories.find(c => c.id === id)?.name || 'Uncategorized';
 
   const filteredExpenses = expenses.filter(exp => {
     const matchesSearch = exp.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -273,12 +177,40 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
 
   const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
 
+  // Calculate expenses by category for chart
+  const expensesByCategory = useMemo(() => {
+    const categoryTotals = new Map<string, number>();
+    
+    expenses.forEach(exp => {
+      const catId = exp.category_id || 'uncategorized';
+      const current = categoryTotals.get(catId) || 0;
+      categoryTotals.set(catId, current + Number(exp.amount));
+    });
+
+    return inventoryCategories
+      .map(cat => ({
+        name: cat.name,
+        amount: categoryTotals.get(cat.id) || 0,
+      }))
+      .concat(categoryTotals.has('uncategorized') ? [{ name: 'Uncategorized', amount: categoryTotals.get('uncategorized') || 0 }] : [])
+      .filter(item => item.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+  }, [expenses, inventoryCategories]);
+
+  const CHART_COLORS = [
+    'hsl(var(--primary))',
+    'hsl(var(--chart-2))',
+    'hsl(var(--chart-3))',
+    'hsl(var(--chart-4))',
+    'hsl(var(--chart-5))',
+  ];
+
   return (
     <div className="space-y-6">
       <Tabs defaultValue="expenses">
         <TabsList>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="categories">Categories & Subcategories</TabsTrigger>
+          <TabsTrigger value="categories">By Category</TabsTrigger>
         </TabsList>
 
         <TabsContent value="expenses" className="space-y-4">
@@ -312,7 +244,6 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                 setEditingExpense(null);
                 setExpenseForm({
                   category_id: '',
-                  subcategory_id: '',
                   name: '',
                   amount: 0,
                   expense_date: format(new Date(), 'yyyy-MM-dd'),
@@ -362,8 +293,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                       value={expenseForm.category_id} 
                       onValueChange={(value) => setExpenseForm({ 
                         ...expenseForm, 
-                        category_id: value,
-                        subcategory_id: '' 
+                        category_id: value
                       })}
                     >
                       <SelectTrigger>
@@ -376,27 +306,6 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                       </SelectContent>
                     </Select>
                   </div>
-                  {filteredSubcategories.length > 0 && (
-                    <div>
-                      <Label>Subcategory</Label>
-                      <Select 
-                        value={expenseForm.subcategory_id} 
-                        onValueChange={(value) => setExpenseForm({ ...expenseForm, subcategory_id: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select subcategory" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredSubcategories.map(sub => (
-                            <SelectItem key={sub.id} value={sub.id}>
-                              {sub.name}
-                              {sub.event_id && ` (${getEventName(sub.event_id)})`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
                   <div>
                     <Label>Notes</Label>
                     <Textarea
@@ -418,7 +327,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
             <CardHeader className="pb-2">
               <div className="flex justify-between items-center">
                 <CardTitle>Expenses</CardTitle>
-                <span className="text-lg font-semibold text-red-600">Total: ${totalExpenses.toFixed(2)}</span>
+                <span className="text-lg font-semibold text-destructive">Total: ${totalExpenses.toFixed(2)}</span>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -427,7 +336,6 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Subcategory</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -436,7 +344,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                 <TableBody>
                   {filteredExpenses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         No expenses found
                       </TableCell>
                     </TableRow>
@@ -445,11 +353,10 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                       <TableRow key={exp.id}>
                         <TableCell className="font-medium">{exp.name}</TableCell>
                         <TableCell>{getCategoryName(exp.category_id)}</TableCell>
-                        <TableCell>{getSubcategoryName(exp.subcategory_id)}</TableCell>
                         <TableCell>
                           {exp.expense_date ? format(new Date(exp.expense_date), 'MMM d, yyyy') : '-'}
                         </TableCell>
-                        <TableCell className="text-right font-medium text-red-600">
+                        <TableCell className="text-right font-medium text-destructive">
                           ${Number(exp.amount).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
@@ -472,147 +379,48 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
         </TabsContent>
 
         <TabsContent value="categories" className="space-y-6">
-          {/* Categories Section - Read-only from Inventory Categories */}
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>Categories</CardTitle>
+                <CardTitle>Expenses by Category</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Managed in Settings → Inventory Categories
+                  Categories managed in Settings → Inventory Categories
                 </p>
               </div>
             </CardHeader>
             <CardContent>
-              {inventoryCategories.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No categories yet</p>
+              {expensesByCategory.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No expense data yet</p>
               ) : (
-                <div className="space-y-2">
-                  {inventoryCategories.map(cat => (
-                    <div key={cat.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div>
-                        <p className="font-medium">{cat.name}</p>
-                        {cat.description && (
-                          <p className="text-sm text-muted-foreground">{cat.description}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Subcategories Section */}
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Subcategories</CardTitle>
-                <Dialog open={isSubcategoryDialogOpen} onOpenChange={(open) => {
-                  setIsSubcategoryDialogOpen(open);
-                  if (!open) {
-                    setEditingSubcategory(null);
-                    setSubcategoryForm({ category_id: '', event_id: '', name: '', description: '' });
-                  }
-                }}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" disabled={inventoryCategories.length === 0}>
-                      <FolderPlus className="w-4 h-4 mr-2" />
-                      Add Subcategory
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{editingSubcategory ? 'Edit Subcategory' : 'Add Subcategory'}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Parent Category *</Label>
-                        <Select 
-                          value={subcategoryForm.category_id} 
-                          onValueChange={(value) => setSubcategoryForm({ ...subcategoryForm, category_id: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {inventoryCategories.map(cat => (
-                              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Name *</Label>
-                        <Input
-                          value={subcategoryForm.name}
-                          onChange={(e) => setSubcategoryForm({ ...subcategoryForm, name: e.target.value })}
-                          placeholder="Subcategory name"
-                        />
-                      </div>
-                      <div>
-                        <Label>Link to Event (Optional)</Label>
-                        <Select 
-                          value={subcategoryForm.event_id} 
-                          onValueChange={(value) => setSubcategoryForm({ ...subcategoryForm, event_id: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select event (optional)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="">No event</SelectItem>
-                            {events.map(event => (
-                              <SelectItem key={event.id} value={event.id}>{event.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Link to a specific event for event-related expenses
-                        </p>
-                      </div>
-                      <div>
-                        <Label>Description</Label>
-                        <Textarea
-                          value={subcategoryForm.description}
-                          onChange={(e) => setSubcategoryForm({ ...subcategoryForm, description: e.target.value })}
-                          placeholder="Optional description"
-                          rows={2}
-                        />
-                      </div>
-                      <Button onClick={handleSaveSubcategory} className="w-full">
-                        {editingSubcategory ? 'Update' : 'Create'} Subcategory
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {subcategories.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No subcategories yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {subcategories.map(sub => (
-                    <div key={sub.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div>
-                        <p className="font-medium">{sub.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {getCategoryName(sub.category_id)}
-                          {sub.event_id && ` → ${getEventName(sub.event_id)}`}
-                        </p>
-                        {sub.description && (
-                          <p className="text-xs text-muted-foreground">{sub.description}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEditSubcategory(sub)}>
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteSubcategory(sub.id)}>
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={expensesByCategory} layout="vertical" margin={{ left: 20, right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                      <XAxis 
+                        type="number" 
+                        tickFormatter={(value) => `$${value.toLocaleString()}`}
+                      />
+                      <YAxis 
+                        type="category" 
+                        dataKey="name" 
+                        width={120}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => [`$${value.toFixed(2)}`, 'Amount']}
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px'
+                        }}
+                      />
+                      <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                        {expensesByCategory.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               )}
             </CardContent>
