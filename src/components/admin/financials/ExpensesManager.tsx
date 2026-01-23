@@ -458,11 +458,9 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                         <TableCell className="font-medium">{exp.name}</TableCell>
                         <TableCell>
                           {exp.source === 'event' ? (
-                            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                              {exp.event_name}
-                            </span>
+                            <span className="text-xs">{exp.event_name}</span>
                           ) : (
-                            <span className="text-xs text-muted-foreground">General</span>
+                            <span className="text-xs">General</span>
                           )}
                         </TableCell>
                         <TableCell>{getUnifiedCategoryName(exp)}</TableCell>
