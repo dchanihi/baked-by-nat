@@ -55,16 +55,44 @@ interface Expense {
   created_at: string;
 }
 
+interface EventExpense {
+  id: string;
+  event_id: string;
+  name: string;
+  amount: number;
+  category: string | null;
+  expense_date: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 interface Event {
   id: string;
   name: string;
 }
 
+// Unified expense type for display
+interface UnifiedExpense {
+  id: string;
+  name: string;
+  amount: number;
+  category_id: string | null;
+  category_name: string | null; // For event expenses that use category name directly
+  expense_date: string | null;
+  notes: string | null;
+  source: 'general' | 'event';
+  event_name?: string;
+  original: Expense | EventExpense;
+}
+
 const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
   const [inventoryCategories, setInventoryCategories] = useState<InventoryCategory[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [eventExpenses, setEventExpenses] = useState<EventExpense[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterSource, setFilterSource] = useState<string>('all');
   
   // Dialog states
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
@@ -85,14 +113,20 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
   }, []);
 
   const loadData = async () => {
-    const [inventoryCategoriesRes, expensesRes] = await Promise.all([
+    const [inventoryCategoriesRes, expensesRes, eventExpensesRes, eventsRes] = await Promise.all([
       supabase.from('inventory_categories').select('*').order('display_order'),
       supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
+      supabase.from('event_expenses').select('*').order('expense_date', { ascending: false }),
+      supabase.from('events').select('id, name').order('start_time', { ascending: false }),
     ]);
 
     if (inventoryCategoriesRes.data) setInventoryCategories(inventoryCategoriesRes.data);
     if (expensesRes.data) setExpenses(expensesRes.data);
+    if (eventExpensesRes.data) setEventExpenses(eventExpensesRes.data);
+    if (eventsRes.data) setEvents(eventsRes.data);
   };
+
+  const getEventName = (eventId: string) => events.find(e => e.id === eventId)?.name || 'Unknown Event';
 
   // Expense handlers
   const handleSaveExpense = async () => {
@@ -169,33 +203,92 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
 
   const getCategoryName = (id: string | null) => inventoryCategories.find(c => c.id === id)?.name || 'Uncategorized';
 
-  const filteredExpenses = expenses.filter(exp => {
-    const matchesSearch = exp.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || exp.category_id === filterCategory;
-    return matchesSearch && matchesCategory;
+  // Create unified expense list combining general and event expenses
+  const unifiedExpenses: UnifiedExpense[] = useMemo(() => {
+    const generalExpenses: UnifiedExpense[] = expenses.map(exp => ({
+      id: exp.id,
+      name: exp.name,
+      amount: exp.amount,
+      category_id: exp.category_id,
+      category_name: null,
+      expense_date: exp.expense_date,
+      notes: exp.notes,
+      source: 'general' as const,
+      original: exp,
+    }));
+
+    const eventExpensesList: UnifiedExpense[] = eventExpenses.map(exp => ({
+      id: exp.id,
+      name: exp.name,
+      amount: exp.amount,
+      category_id: null,
+      category_name: exp.category || null,
+      expense_date: exp.expense_date,
+      notes: exp.notes,
+      source: 'event' as const,
+      event_name: getEventName(exp.event_id),
+      original: exp,
+    }));
+
+    return [...generalExpenses, ...eventExpensesList].sort((a, b) => {
+      const dateA = a.expense_date ? new Date(a.expense_date).getTime() : 0;
+      const dateB = b.expense_date ? new Date(b.expense_date).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [expenses, eventExpenses, events]);
+
+  const getUnifiedCategoryName = (exp: UnifiedExpense) => {
+    if (exp.category_name) return exp.category_name;
+    return getCategoryName(exp.category_id);
+  };
+
+  const filteredExpenses = unifiedExpenses.filter(exp => {
+    const matchesSearch = exp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (exp.event_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+    
+    // For category filter, match by ID for general expenses or by name for event expenses
+    let matchesCategory = filterCategory === 'all';
+    if (!matchesCategory) {
+      if (exp.category_id === filterCategory) {
+        matchesCategory = true;
+      } else if (exp.category_name) {
+        const filterCat = inventoryCategories.find(c => c.id === filterCategory);
+        matchesCategory = filterCat?.name === exp.category_name;
+      }
+    }
+    
+    const matchesSource = filterSource === 'all' || 
+      (filterSource === 'general' && exp.source === 'general') ||
+      (filterSource === 'event' && exp.source === 'event');
+    
+    return matchesSearch && matchesCategory && matchesSource;
   });
 
   const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
 
-  // Calculate expenses by category for chart
+  // Calculate expenses by category for chart (includes both sources)
   const expensesByCategory = useMemo(() => {
     const categoryTotals = new Map<string, number>();
     
+    // Add general expenses by category ID
     expenses.forEach(exp => {
-      const catId = exp.category_id || 'uncategorized';
-      const current = categoryTotals.get(catId) || 0;
-      categoryTotals.set(catId, current + Number(exp.amount));
+      const catName = getCategoryName(exp.category_id);
+      const current = categoryTotals.get(catName) || 0;
+      categoryTotals.set(catName, current + Number(exp.amount));
     });
 
-    return inventoryCategories
-      .map(cat => ({
-        name: cat.name,
-        amount: categoryTotals.get(cat.id) || 0,
-      }))
-      .concat(categoryTotals.has('uncategorized') ? [{ name: 'Uncategorized', amount: categoryTotals.get('uncategorized') || 0 }] : [])
+    // Add event expenses by category name
+    eventExpenses.forEach(exp => {
+      const catName = exp.category || 'Uncategorized';
+      const current = categoryTotals.get(catName) || 0;
+      categoryTotals.set(catName, current + Number(exp.amount));
+    });
+
+    return Array.from(categoryTotals.entries())
+      .map(([name, amount]) => ({ name, amount }))
       .filter(item => item.amount > 0)
       .sort((a, b) => b.amount - a.amount);
-  }, [expenses, inventoryCategories]);
+  }, [expenses, eventExpenses, inventoryCategories]);
 
   const CHART_COLORS = [
     'hsl(var(--primary))',
@@ -234,6 +327,16 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                   {inventoryCategories.map(cat => (
                     <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterSource} onValueChange={setFilterSource}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="event">Events</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -335,6 +438,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Source</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
@@ -344,15 +448,24 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                 <TableBody>
                   {filteredExpenses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         No expenses found
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredExpenses.map((exp) => (
-                      <TableRow key={exp.id}>
+                      <TableRow key={`${exp.source}-${exp.id}`}>
                         <TableCell className="font-medium">{exp.name}</TableCell>
-                        <TableCell>{getCategoryName(exp.category_id)}</TableCell>
+                        <TableCell>
+                          {exp.source === 'event' ? (
+                            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                              {exp.event_name}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">General</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{getUnifiedCategoryName(exp)}</TableCell>
                         <TableCell>
                           {exp.expense_date ? format(new Date(exp.expense_date), 'MMM d, yyyy') : '-'}
                         </TableCell>
@@ -360,14 +473,18 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                           ${Number(exp.amount).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => openEditExpense(exp)}>
-                              <Edit2 className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteExpense(exp.id)}>
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                          </div>
+                          {exp.source === 'general' ? (
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => openEditExpense(exp.original as Expense)}>
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteExpense(exp.id)}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Edit in Event</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
@@ -384,7 +501,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
               <div className="flex justify-between items-center">
                 <CardTitle>Expenses by Category</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Categories managed in Settings → Inventory Categories
+                  Includes both general and event expenses
                 </p>
               </div>
             </CardHeader>
