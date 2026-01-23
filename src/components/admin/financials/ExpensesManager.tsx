@@ -36,10 +36,11 @@ interface ExpensesManagerProps {
   onDataChange?: () => void;
 }
 
-interface Category {
+interface InventoryCategory {
   id: string;
   name: string;
   description: string | null;
+  display_order: number;
 }
 
 interface Subcategory {
@@ -67,7 +68,7 @@ interface Event {
 }
 
 const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [inventoryCategories, setInventoryCategories] = useState<InventoryCategory[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -75,12 +76,10 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   
   // Dialog states
-  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isSubcategoryDialogOpen, setIsSubcategoryDialogOpen] = useState(false);
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   
   // Form states
-  const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
   const [subcategoryForm, setSubcategoryForm] = useState({ 
     category_id: '', 
     event_id: '', 
@@ -96,7 +95,6 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
     notes: '',
   });
   
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
@@ -105,67 +103,17 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
   }, []);
 
   const loadData = async () => {
-    const [categoriesRes, subcategoriesRes, expensesRes, eventsRes] = await Promise.all([
-      supabase.from('expense_categories').select('*').order('name'),
+    const [inventoryCategoriesRes, subcategoriesRes, expensesRes, eventsRes] = await Promise.all([
+      supabase.from('inventory_categories').select('*').order('display_order'),
       supabase.from('expense_subcategories').select('*').order('name'),
       supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
       supabase.from('events').select('id, name').order('start_time', { ascending: false }),
     ]);
 
-    if (categoriesRes.data) setCategories(categoriesRes.data);
+    if (inventoryCategoriesRes.data) setInventoryCategories(inventoryCategoriesRes.data);
     if (subcategoriesRes.data) setSubcategories(subcategoriesRes.data);
     if (expensesRes.data) setExpenses(expensesRes.data);
     if (eventsRes.data) setEvents(eventsRes.data);
-  };
-
-  // Category handlers
-  const handleSaveCategory = async () => {
-    if (!categoryForm.name.trim()) {
-      toast({ title: 'Category name is required', variant: 'destructive' });
-      return;
-    }
-
-    if (editingCategory) {
-      const { error } = await supabase
-        .from('expense_categories')
-        .update({ name: categoryForm.name, description: categoryForm.description || null })
-        .eq('id', editingCategory.id);
-
-      if (error) {
-        toast({ title: 'Error updating category', description: error.message, variant: 'destructive' });
-        return;
-      }
-      toast({ title: 'Category updated' });
-    } else {
-      const { error } = await supabase
-        .from('expense_categories')
-        .insert({ name: categoryForm.name, description: categoryForm.description || null });
-
-      if (error) {
-        toast({ title: 'Error creating category', description: error.message, variant: 'destructive' });
-        return;
-      }
-      toast({ title: 'Category created' });
-    }
-
-    setIsCategoryDialogOpen(false);
-    setCategoryForm({ name: '', description: '' });
-    setEditingCategory(null);
-    loadData();
-    onDataChange?.();
-  };
-
-  const handleDeleteCategory = async (id: string) => {
-    if (!confirm('This will also delete all subcategories and unlink expenses. Continue?')) return;
-    
-    const { error } = await supabase.from('expense_categories').delete().eq('id', id);
-    if (error) {
-      toast({ title: 'Error deleting category', description: error.message, variant: 'destructive' });
-      return;
-    }
-    toast({ title: 'Category deleted' });
-    loadData();
-    onDataChange?.();
   };
 
   // Subcategory handlers
@@ -285,12 +233,6 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
     onDataChange?.();
   };
 
-  const openEditCategory = (cat: Category) => {
-    setEditingCategory(cat);
-    setCategoryForm({ name: cat.name, description: cat.description || '' });
-    setIsCategoryDialogOpen(true);
-  };
-
   const openEditSubcategory = (sub: Subcategory) => {
     setEditingSubcategory(sub);
     setSubcategoryForm({
@@ -315,7 +257,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
     setIsExpenseDialogOpen(true);
   };
 
-  const getCategoryName = (id: string | null) => categories.find(c => c.id === id)?.name || '-';
+  const getCategoryName = (id: string | null) => inventoryCategories.find(c => c.id === id)?.name || '-';
   const getSubcategoryName = (id: string | null) => subcategories.find(s => s.id === id)?.name || '-';
   const getEventName = (id: string | null) => events.find(e => e.id === id)?.name;
 
@@ -357,7 +299,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map(cat => (
+                  {inventoryCategories.map(cat => (
                     <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -428,7 +370,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map(cat => (
+                        {inventoryCategories.map(cat => (
                           <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -530,74 +472,28 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
         </TabsContent>
 
         <TabsContent value="categories" className="space-y-6">
-          {/* Categories Section */}
+          {/* Categories Section - Read-only from Inventory Categories */}
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Categories</CardTitle>
-                <Dialog open={isCategoryDialogOpen} onOpenChange={(open) => {
-                  setIsCategoryDialogOpen(open);
-                  if (!open) {
-                    setEditingCategory(null);
-                    setCategoryForm({ name: '', description: '' });
-                  }
-                }}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Category
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{editingCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Name *</Label>
-                        <Input
-                          value={categoryForm.name}
-                          onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                          placeholder="e.g., Events, Supplies, Marketing"
-                        />
-                      </div>
-                      <div>
-                        <Label>Description</Label>
-                        <Textarea
-                          value={categoryForm.description}
-                          onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
-                          placeholder="Optional description"
-                          rows={2}
-                        />
-                      </div>
-                      <Button onClick={handleSaveCategory} className="w-full">
-                        {editingCategory ? 'Update' : 'Create'} Category
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <p className="text-sm text-muted-foreground">
+                  Managed in Settings → Inventory Categories
+                </p>
               </div>
             </CardHeader>
             <CardContent>
-              {categories.length === 0 ? (
+              {inventoryCategories.length === 0 ? (
                 <p className="text-muted-foreground text-center py-4">No categories yet</p>
               ) : (
                 <div className="space-y-2">
-                  {categories.map(cat => (
+                  {inventoryCategories.map(cat => (
                     <div key={cat.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div>
                         <p className="font-medium">{cat.name}</p>
                         {cat.description && (
                           <p className="text-sm text-muted-foreground">{cat.description}</p>
                         )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEditCategory(cat)}>
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteCategory(cat.id)}>
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
                       </div>
                     </div>
                   ))}
@@ -619,7 +515,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                   }
                 }}>
                   <DialogTrigger asChild>
-                    <Button size="sm" disabled={categories.length === 0}>
+                    <Button size="sm" disabled={inventoryCategories.length === 0}>
                       <FolderPlus className="w-4 h-4 mr-2" />
                       Add Subcategory
                     </Button>
@@ -639,7 +535,7 @@ const ExpensesManager = ({ onDataChange }: ExpensesManagerProps) => {
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                           <SelectContent>
-                            {categories.map(cat => (
+                            {inventoryCategories.map(cat => (
                               <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                             ))}
                           </SelectContent>
