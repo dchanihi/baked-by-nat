@@ -21,16 +21,28 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Plus, Edit2, Trash2, ChefHat, Search, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChefHat, Search, X, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface BakeCategory {
   id: string;
@@ -87,13 +99,10 @@ const RecipesContent = () => {
     category: '',
   });
   const [tempIngredients, setTempIngredients] = useState<TempIngredient[]>([]);
-  const [newIngredient, setNewIngredient] = useState<TempIngredient>({
-    inventory_item_id: '',
-    quantity: 0,
-    unit: 'units',
-  });
   const [categorySearch, setCategorySearch] = useState('');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  const [openIngredientPopover, setOpenIngredientPopover] = useState<number | null>(null);
   const categoryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -167,11 +176,13 @@ const RecipesContent = () => {
       yield_unit: 'pc',
       category: '',
     });
-    setTempIngredients([]);
-    setNewIngredient({ inventory_item_id: '', quantity: 0, unit: 'units' });
+    // Start with one empty row for new ingredients
+    setTempIngredients([{ inventory_item_id: '', quantity: 0, unit: 'g' }]);
     setEditingRecipe(null);
     setCategorySearch('');
     setShowCategoryDropdown(false);
+    setIsDescriptionOpen(false);
+    setOpenIngredientPopover(null);
   };
 
   const openEditDialog = async (recipe: Recipe) => {
@@ -184,6 +195,7 @@ const RecipesContent = () => {
       category: recipe.category || '',
     });
     setCategorySearch(recipe.category || '');
+    setIsDescriptionOpen(false); // Auto-collapse description
 
     // Load existing ingredients
     const { data: ingredientsData } = await supabase
@@ -191,13 +203,14 @@ const RecipesContent = () => {
       .select('*')
       .eq('recipe_id', recipe.id);
 
-    setTempIngredients(
-      (ingredientsData || []).map((ing) => ({
-        inventory_item_id: ing.inventory_item_id,
-        quantity: Number(ing.quantity),
-        unit: ing.unit,
-      }))
-    );
+    const existingIngredients = (ingredientsData || []).map((ing) => ({
+      inventory_item_id: ing.inventory_item_id,
+      quantity: Number(ing.quantity),
+      unit: ing.unit,
+    }));
+    
+    // Add an empty row for adding new ingredients
+    setTempIngredients([...existingIngredients, { inventory_item_id: '', quantity: 0, unit: 'g' }]);
     setIsDialogOpen(true);
   };
 
@@ -214,24 +227,39 @@ const RecipesContent = () => {
     setShowCategoryDropdown(false);
   };
 
-  const addIngredient = () => {
-    if (!newIngredient.inventory_item_id || newIngredient.quantity <= 0) {
-      toast({ title: 'Please select an item and enter a quantity', variant: 'destructive' });
-      return;
+  const updateIngredient = (index: number, field: keyof TempIngredient, value: string | number) => {
+    const updated = [...tempIngredients];
+    updated[index] = { ...updated[index], [field]: value };
+    
+    // If updating inventory_item_id, also set default unit from inventory
+    if (field === 'inventory_item_id' && value) {
+      const item = getInventoryItemById(value as string);
+      if (item?.unit) {
+        updated[index].unit = item.unit;
+      }
     }
-
-    // Check if already added
-    if (tempIngredients.some((i) => i.inventory_item_id === newIngredient.inventory_item_id)) {
-      toast({ title: 'This ingredient is already added', variant: 'destructive' });
-      return;
+    
+    setTempIngredients(updated);
+    
+    // Auto-add new row if the last row now has an item selected
+    if (index === tempIngredients.length - 1 && field === 'inventory_item_id' && value) {
+      setTempIngredients([...updated, { inventory_item_id: '', quantity: 0, unit: 'g' }]);
     }
-
-    setTempIngredients([...tempIngredients, { ...newIngredient }]);
-    setNewIngredient({ inventory_item_id: '', quantity: 0, unit: 'units' });
   };
 
-  const removeIngredient = (inventoryItemId: string) => {
-    setTempIngredients(tempIngredients.filter((i) => i.inventory_item_id !== inventoryItemId));
+  const removeIngredient = (index: number) => {
+    // Don't remove if it's the last empty row
+    if (tempIngredients.length === 1) {
+      setTempIngredients([{ inventory_item_id: '', quantity: 0, unit: 'g' }]);
+      return;
+    }
+    const updated = tempIngredients.filter((_, i) => i !== index);
+    // Ensure there's always at least one empty row at the end
+    const lastItem = updated[updated.length - 1];
+    if (lastItem && lastItem.inventory_item_id) {
+      updated.push({ inventory_item_id: '', quantity: 0, unit: 'g' });
+    }
+    setTempIngredients(updated);
   };
 
   const handleSubmit = async () => {
@@ -240,7 +268,10 @@ const RecipesContent = () => {
       return;
     }
 
-    if (tempIngredients.length === 0) {
+    // Filter out empty ingredient rows
+    const validIngredients = tempIngredients.filter(ing => ing.inventory_item_id && ing.quantity > 0);
+    
+    if (validIngredients.length === 0) {
       toast({ title: 'Please add at least one ingredient', variant: 'destructive' });
       return;
     }
@@ -271,7 +302,7 @@ const RecipesContent = () => {
         const { error: ingredientsError } = await supabase
           .from('recipe_ingredients')
           .insert(
-            tempIngredients.map((ing) => ({
+            validIngredients.map((ing) => ({
               recipe_id: editingRecipe.id,
               inventory_item_id: ing.inventory_item_id,
               quantity: ing.quantity,
@@ -302,7 +333,7 @@ const RecipesContent = () => {
         const { error: ingredientsError } = await supabase
           .from('recipe_ingredients')
           .insert(
-            tempIngredients.map((ing) => ({
+            validIngredients.map((ing) => ({
               recipe_id: newRecipe.id,
               inventory_item_id: ing.inventory_item_id,
               quantity: ing.quantity,
@@ -337,8 +368,26 @@ const RecipesContent = () => {
     loadRecipes();
   };
 
-  const getInventoryItemById = (id: string) => {
+  const getInventoryItemById = (id: string): InventoryItem | undefined => {
     return inventoryItems.find((item) => item.id === id);
+  };
+
+  // Get available inventory items (not already used in other rows)
+  const getAvailableInventoryItems = (currentIndex: number) => {
+    const usedIds = tempIngredients
+      .filter((_, i) => i !== currentIndex)
+      .map((ing) => ing.inventory_item_id)
+      .filter(Boolean);
+    return inventoryItems.filter((item) => !usedIds.includes(item.id));
+  };
+
+  // Calculate total cost from temp ingredients
+  const calculateTempTotalCost = () => {
+    return tempIngredients.reduce((sum, ing) => {
+      if (!ing.inventory_item_id) return sum;
+      const item = getInventoryItemById(ing.inventory_item_id);
+      return sum + (item?.cost_per_unit ? ing.quantity * Number(item.cost_per_unit) : 0);
+    }, 0);
   };
 
   const calculateRecipeCost = (recipe: Recipe) => {
@@ -475,126 +524,151 @@ const RecipesContent = () => {
                     )}
                   </div>
                 </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Recipe description or notes"
-                    rows={2}
-                  />
-                </div>
+                {/* Collapsible Description */}
+                <Collapsible open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full justify-between px-0 hover:bg-transparent">
+                      <Label className="cursor-pointer">Description</Label>
+                      <ChevronDown className={cn("h-4 w-4 transition-transform", isDescriptionOpen && "rotate-180")} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Recipe description or notes"
+                      rows={2}
+                      className="mt-1"
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
 
-              {/* Ingredients Section */}
-              <div className="space-y-4">
+              {/* Ingredients Section - Tabular Format */}
+              <div className="space-y-2">
                 <h3 className="font-semibold">Ingredients</h3>
                 
-                {/* Add ingredient form */}
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <Label>Inventory Item</Label>
-                    <Select
-                      value={newIngredient.inventory_item_id}
-                      onValueChange={(value) =>
-                        setNewIngredient({
-                          ...newIngredient,
-                          inventory_item_id: value,
-                          unit: getInventoryItemById(value)?.unit || 'units',
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select item" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {inventoryItems.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.name} {item.category && `(${item.category})`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="w-24">
-                    <Label>Quantity</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={newIngredient.quantity}
-                      onChange={(e) =>
-                        setNewIngredient({ ...newIngredient, quantity: Number(e.target.value) })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>Unit</Label>
-                    <ToggleGroup
-                      type="single"
-                      value={newIngredient.unit}
-                      onValueChange={(value) => {
-                        if (value) setNewIngredient({ ...newIngredient, unit: value });
-                      }}
-                      className="justify-start"
-                    >
-                      <ToggleGroupItem value="g" aria-label="Grams">g</ToggleGroupItem>
-                      <ToggleGroupItem value="kg" aria-label="Kilograms">kg</ToggleGroupItem>
-                      <ToggleGroupItem value="pc" aria-label="Pieces">pc</ToggleGroupItem>
-                    </ToggleGroup>
-                  </div>
-                  <Button type="button" onClick={addIngredient} size="icon">
-                    <Plus className="w-4 h-4" />
-                  </Button>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="w-[45%]">Inventory Item</TableHead>
+                        <TableHead className="w-[20%] text-center">Qty</TableHead>
+                        <TableHead className="w-[20%] text-center">Unit</TableHead>
+                        <TableHead className="w-[10%] text-right">Cost</TableHead>
+                        <TableHead className="w-[5%]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tempIngredients.map((ing, index) => {
+                        const item = ing.inventory_item_id ? getInventoryItemById(ing.inventory_item_id) : null;
+                        const cost = item?.cost_per_unit ? ing.quantity * Number(item.cost_per_unit) : 0;
+                        const availableItems = getAvailableInventoryItems(index);
+                        
+                        return (
+                          <TableRow key={index} className="group">
+                            <TableCell className="p-1">
+                              <Popover 
+                                open={openIngredientPopover === index} 
+                                onOpenChange={(open) => setOpenIngredientPopover(open ? index : null)}
+                              >
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className="w-full justify-between h-9 font-normal"
+                                  >
+                                    {item ? (
+                                      <span className="truncate">{item.name}</span>
+                                    ) : (
+                                      <span className="text-muted-foreground">Select item...</span>
+                                    )}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[300px] p-0" align="start">
+                                  <Command>
+                                    <CommandInput placeholder="Search inventory..." />
+                                    <CommandList>
+                                      <CommandEmpty>No item found.</CommandEmpty>
+                                      <CommandGroup>
+                                        {availableItems.map((invItem) => (
+                                          <CommandItem
+                                            key={invItem.id}
+                                            value={invItem.name}
+                                            onSelect={() => {
+                                              updateIngredient(index, 'inventory_item_id', invItem.id);
+                                              setOpenIngredientPopover(null);
+                                            }}
+                                          >
+                                            <span>{invItem.name}</span>
+                                            {invItem.category && (
+                                              <span className="ml-2 text-xs text-muted-foreground">
+                                                ({invItem.category})
+                                              </span>
+                                            )}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            </TableCell>
+                            <TableCell className="p-1">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={ing.quantity || ''}
+                                onChange={(e) => updateIngredient(index, 'quantity', Number(e.target.value))}
+                                className="h-9 text-center"
+                                placeholder="0"
+                              />
+                            </TableCell>
+                            <TableCell className="p-1">
+                              <ToggleGroup
+                                type="single"
+                                value={ing.unit}
+                                onValueChange={(value) => {
+                                  if (value) updateIngredient(index, 'unit', value);
+                                }}
+                                className="justify-center"
+                                size="sm"
+                              >
+                                <ToggleGroupItem value="g" aria-label="Grams" className="h-9 px-2 text-xs">g</ToggleGroupItem>
+                                <ToggleGroupItem value="kg" aria-label="Kilograms" className="h-9 px-2 text-xs">kg</ToggleGroupItem>
+                                <ToggleGroupItem value="pc" aria-label="Pieces" className="h-9 px-2 text-xs">pc</ToggleGroupItem>
+                              </ToggleGroup>
+                            </TableCell>
+                            <TableCell className="p-1 text-right text-sm text-muted-foreground">
+                              {cost > 0 ? `$${cost.toFixed(2)}` : '-'}
+                            </TableCell>
+                            <TableCell className="p-1">
+                              {ing.inventory_item_id && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => removeIngredient(index)}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {/* Total row */}
+                      <TableRow className="bg-muted/50 font-medium">
+                        <TableCell colSpan={3} className="text-right">Total Cost</TableCell>
+                        <TableCell className="text-right">${calculateTempTotalCost().toFixed(2)}</TableCell>
+                        <TableCell></TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
                 </div>
-
-                {/* Ingredients list */}
-                {tempIngredients.length > 0 && (
-                  <div className="border rounded-lg divide-y">
-                    {tempIngredients.map((ing) => {
-                      const item = getInventoryItemById(ing.inventory_item_id);
-                      const cost = item?.cost_per_unit ? ing.quantity * Number(item.cost_per_unit) : 0;
-                      return (
-                        <div
-                          key={ing.inventory_item_id}
-                          className="flex items-center justify-between p-3"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="font-medium">{item?.name || 'Unknown'}</span>
-                            <Badge variant="secondary">
-                              {ing.quantity} {ing.unit}
-                            </Badge>
-                            {cost > 0 && (
-                              <span className="text-sm text-muted-foreground">
-                                ${cost.toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeIngredient(ing.inventory_item_id)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                    <div className="p-3 bg-muted/50 flex justify-between">
-                      <span className="font-medium">Total Cost</span>
-                      <span className="font-bold">
-                        $
-                        {tempIngredients
-                          .reduce((sum, ing) => {
-                            const item = getInventoryItemById(ing.inventory_item_id);
-                            return sum + (item?.cost_per_unit ? ing.quantity * Number(item.cost_per_unit) : 0);
-                          }, 0)
-                          .toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <Button onClick={handleSubmit} className="w-full">
