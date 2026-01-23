@@ -78,85 +78,91 @@ const IncomeOverview = ({ onDataChange, selectedPeriod, selectedLocation, onLoca
     const yearStart = startOfYear(new Date(currentYear, 0, 1));
     const yearEnd = endOfYear(new Date(currentYear, 11, 31));
 
-    // Get archived years to exclude
-    const { data: archivesData } = await supabase
-      .from('yearly_archives')
-      .select('year');
-    
+    // Fetch all data in parallel for maximum speed
+    const [
+      { data: archivesData },
+      { data: eventsData },
+      { data: allEventItems },
+      { data: allEventSales },
+      { data: allEventExpenses },
+      { data: ordersData },
+      { data: fullArchivesData },
+      { data: yearSales },
+      { data: yearOrders },
+    ] = await Promise.all([
+      supabase.from('yearly_archives').select('year'),
+      supabase.from('events').select('id, name, location, start_time').eq('status', 'completed').order('start_time', { ascending: false }),
+      supabase.from('event_items').select('id, event_id'),
+      supabase.from('event_sales').select('event_item_id, total_price, quantity, created_at'),
+      supabase.from('event_expenses').select('event_id, amount'),
+      supabase.from('orders').select('id, customer_name, bake_title, quantity, created_at').eq('status', 'completed').order('created_at', { ascending: false }),
+      supabase.from('yearly_archives').select('*').order('year', { ascending: false }),
+      supabase.from('event_sales').select('total_price, created_at').gte('created_at', yearStart.toISOString()).lte('created_at', yearEnd.toISOString()),
+      supabase.from('orders').select('id, created_at').eq('status', 'completed').gte('created_at', yearStart.toISOString()).lte('created_at', yearEnd.toISOString()),
+    ]);
+
     const archivedYears = archivesData?.map(a => a.year) || [];
 
-    // Load ALL completed events (we'll filter out archived ones)
-    const { data: eventsData } = await supabase
-      .from('events')
-      .select('id, name, location, start_time')
-      .eq('status', 'completed')
-      .order('start_time', { ascending: false });
+    // Build lookup maps for O(1) access
+    const itemsByEvent = new Map<string, string[]>();
+    allEventItems?.forEach(item => {
+      const items = itemsByEvent.get(item.event_id) || [];
+      items.push(item.id);
+      itemsByEvent.set(item.event_id, items);
+    });
+
+    const salesByItem = new Map<string, { total_price: number; quantity: number }[]>();
+    allEventSales?.forEach(sale => {
+      const sales = salesByItem.get(sale.event_item_id) || [];
+      sales.push({ total_price: Number(sale.total_price), quantity: sale.quantity });
+      salesByItem.set(sale.event_item_id, sales);
+    });
+
+    const expensesByEvent = new Map<string, number>();
+    allEventExpenses?.forEach(exp => {
+      expensesByEvent.set(exp.event_id, (expensesByEvent.get(exp.event_id) || 0) + Number(exp.amount));
+    });
 
     if (eventsData) {
-      // Extract unique locations for filtering
       const uniqueLocations = [...new Set(eventsData.map(e => e.location).filter(Boolean))] as string[];
       onLocationsLoaded?.(uniqueLocations);
-      const eventSummaries: EventSummary[] = [];
 
-      for (const event of eventsData) {
-        // Skip events from archived years
-        const eventYear = parseISO(event.start_time).getFullYear();
-        if (archivedYears.includes(eventYear)) continue;
+      const eventSummaries: EventSummary[] = eventsData
+        .filter(event => {
+          const eventYear = parseISO(event.start_time).getFullYear();
+          return !archivedYears.includes(eventYear);
+        })
+        .map(event => {
+          const itemIds = itemsByEvent.get(event.id) || [];
+          let revenue = 0;
+          let itemsSold = 0;
 
-        // Get items for this event
-        const { data: items } = await supabase
-          .from('event_items')
-          .select('id')
-          .eq('event_id', event.id);
+          itemIds.forEach(itemId => {
+            const sales = salesByItem.get(itemId) || [];
+            sales.forEach(sale => {
+              revenue += sale.total_price;
+              itemsSold += sale.quantity;
+            });
+          });
 
-        let revenue = 0;
-        let itemsSold = 0;
+          const expenses = expensesByEvent.get(event.id) || 0;
 
-        if (items && items.length > 0) {
-          const itemIds = items.map(i => i.id);
-          
-          // Get sales for these items
-          const { data: sales } = await supabase
-            .from('event_sales')
-            .select('total_price, quantity')
-            .in('event_item_id', itemIds);
-
-          revenue = sales?.reduce((sum, s) => sum + Number(s.total_price), 0) || 0;
-          itemsSold = sales?.reduce((sum, s) => sum + s.quantity, 0) || 0;
-        }
-
-        // Get expenses for this event
-        const { data: expensesData } = await supabase
-          .from('event_expenses')
-          .select('amount')
-          .eq('event_id', event.id);
-
-        const expenses = expensesData?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
-
-        eventSummaries.push({
-          id: event.id,
-          name: event.name,
-          location: event.location,
-          start_time: event.start_time,
-          revenue,
-          expenses,
-          netProfit: revenue - expenses,
-          itemsSold,
+          return {
+            id: event.id,
+            name: event.name,
+            location: event.location,
+            start_time: event.start_time,
+            revenue,
+            expenses,
+            netProfit: revenue - expenses,
+            itemsSold,
+          };
         });
-      }
 
       setEvents(eventSummaries);
     }
 
-    // Load completed orders (exclude archived years)
-    const { data: ordersData } = await supabase
-      .from('orders')
-      .select('id, customer_name, bake_title, quantity, created_at')
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false });
-
     if (ordersData) {
-      // Filter out orders from archived years
       const filteredOrders = ordersData.filter(order => {
         const orderYear = parseISO(order.created_at).getFullYear();
         return !archivedYears.includes(orderYear);
@@ -164,48 +170,38 @@ const IncomeOverview = ({ onDataChange, selectedPeriod, selectedLocation, onLoca
       setOrders(filteredOrders);
     }
 
-    // Load yearly archives for archive tab
-    const { data: fullArchivesData } = await supabase
-      .from('yearly_archives')
-      .select('*')
-      .order('year', { ascending: false });
-
     if (fullArchivesData) {
       setArchives(fullArchivesData as YearlyArchive[]);
     }
 
-    // Calculate monthly data for current year
-    const months: { month: string; eventsRevenue: number; ordersCount: number }[] = [];
+    // Calculate monthly data from already-fetched data (no additional queries!)
     const now = new Date();
+    const months: { month: string; eventsRevenue: number; ordersCount: number }[] = [];
 
     for (let i = 11; i >= 0; i--) {
       const monthDate = subMonths(now, i);
-      
-      // Only include months from current year
       if (monthDate.getFullYear() !== currentYear) continue;
-      
+
       const monthStart = startOfMonth(monthDate);
       const monthEnd = endOfMonth(monthDate);
 
-      const { data: sales } = await supabase
-        .from('event_sales')
-        .select('total_price, created_at')
-        .gte('created_at', monthStart.toISOString())
-        .lte('created_at', monthEnd.toISOString());
+      const eventsRevenue = yearSales
+        ?.filter(s => {
+          const saleDate = parseISO(s.created_at);
+          return saleDate >= monthStart && saleDate <= monthEnd;
+        })
+        .reduce((sum, s) => sum + Number(s.total_price), 0) || 0;
 
-      const eventsRevenue = sales?.reduce((sum, s) => sum + Number(s.total_price), 0) || 0;
-
-      const { data: monthOrders } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('status', 'completed')
-        .gte('created_at', monthStart.toISOString())
-        .lte('created_at', monthEnd.toISOString());
+      const ordersCount = yearOrders
+        ?.filter(o => {
+          const orderDate = parseISO(o.created_at);
+          return orderDate >= monthStart && orderDate <= monthEnd;
+        }).length || 0;
 
       months.push({
         month: format(monthDate, 'MMM'),
         eventsRevenue,
-        ordersCount: monthOrders?.length || 0,
+        ordersCount,
       });
     }
 
