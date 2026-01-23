@@ -455,7 +455,7 @@ const Admin = () => {
             </TabsContent>
 
             <TabsContent value="orders" className="space-y-6">
-              <OrdersList orders={orders} onView={handleViewOrder} />
+              <OrdersList orders={orders} onView={handleViewOrder} onStatusChange={loadOrders} />
             </TabsContent>
 
             <TabsContent value="bakes" className="space-y-6">

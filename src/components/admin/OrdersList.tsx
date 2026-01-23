@@ -2,9 +2,10 @@ import { format } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, Copy } from 'lucide-react';
+import { Eye, Copy, Check, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Order = Tables<'orders'>;
@@ -12,6 +13,7 @@ type Order = Tables<'orders'>;
 interface OrdersListProps {
   orders: Order[];
   onView: (order: Order) => void;
+  onStatusChange?: () => void;
 }
 
 const statusColors = {
@@ -22,7 +24,7 @@ const statusColors = {
   cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };
 
-export const OrdersList = ({ orders, onView }: OrdersListProps) => {
+export const OrdersList = ({ orders, onView, onStatusChange }: OrdersListProps) => {
   const copyToClipboard = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -37,6 +39,28 @@ export const OrdersList = ({ orders, onView }: OrdersListProps) => {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleStatusUpdate = async (orderId: string, newStatus: 'completed' | 'cancelled') => {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: newStatus })
+      .eq('id', orderId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: `Failed to update order status`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Status Updated',
+      description: `Order marked as ${newStatus}`,
+    });
+    onStatusChange?.();
   };
 
   if (orders.length === 0) {
@@ -123,14 +147,38 @@ export const OrdersList = ({ orders, onView }: OrdersListProps) => {
                 {format(new Date(order.created_at), 'MMM d, yyyy')}
               </TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onView(order)}
-                >
-                  <Eye className="w-4 h-4 mr-1" />
-                  View
-                </Button>
+                <div className="flex flex-col items-end gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onView(order)}
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    View
+                  </Button>
+                  {order.status !== 'completed' && order.status !== 'cancelled' && (
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                        onClick={() => handleStatusUpdate(order.id, 'completed')}
+                        title="Mark as fulfilled"
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleStatusUpdate(order.id, 'cancelled')}
+                        title="Mark as cancelled"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </TableCell>
             </TableRow>
           ))}
