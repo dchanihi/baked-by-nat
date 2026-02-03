@@ -25,6 +25,23 @@ const DEFAULT_PRESETS = [
 ];
 
 const STORAGE_KEY = 'event-item-custom-colors';
+const CUSTOM_COLORS_EVENT = 'custom-colors-updated';
+
+// Helper to load colors from localStorage
+const loadCustomColors = (): string[] => {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to parse custom colors', e);
+    }
+  }
+  return [];
+};
 
 interface ColorPickerProps {
   value: string;
@@ -34,22 +51,29 @@ interface ColorPickerProps {
 
 export const ColorPicker = ({ value, onChange, id }: ColorPickerProps) => {
   const [open, setOpen] = useState(false);
-  const [customColors, setCustomColors] = useState<string[]>([]);
+  const [customColors, setCustomColors] = useState<string[]>(loadCustomColors);
   const [tempColor, setTempColor] = useState(value);
 
-  // Load custom colors from localStorage
+  // Listen for custom color updates from other ColorPicker instances
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setCustomColors(parsed);
-        }
-      } catch (e) {
-        console.error('Failed to parse custom colors', e);
+    const handleCustomColorsUpdate = () => {
+      setCustomColors(loadCustomColors());
+    };
+
+    // Listen for custom event (same tab, different component)
+    window.addEventListener(CUSTOM_COLORS_EVENT, handleCustomColorsUpdate);
+    
+    // Listen for storage event (different tab/window)
+    window.addEventListener('storage', (e) => {
+      if (e.key === STORAGE_KEY) {
+        handleCustomColorsUpdate();
       }
-    }
+    });
+
+    return () => {
+      window.removeEventListener(CUSTOM_COLORS_EVENT, handleCustomColorsUpdate);
+      window.removeEventListener('storage', handleCustomColorsUpdate);
+    };
   }, []);
 
   // Sync tempColor with value when popover opens
@@ -62,6 +86,8 @@ export const ColorPicker = ({ value, onChange, id }: ColorPickerProps) => {
   const saveCustomColors = (colors: string[]) => {
     setCustomColors(colors);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(colors));
+    // Dispatch custom event to notify other ColorPicker instances
+    window.dispatchEvent(new CustomEvent(CUSTOM_COLORS_EVENT));
   };
 
   const addCustomColor = () => {
