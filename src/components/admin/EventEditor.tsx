@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import { ArrowLeft, Plus, Trash2, Link, Package, Filter, Calendar as CalendarIcon, Clock, Tag } from 'lucide-react';
+import { ColorPicker } from './ColorPicker';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -1402,21 +1403,11 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                         </Select>
                       </div>
                       <div className="px-2 py-1.5 flex justify-center">
-                        <div className="relative">
-                          <input
-                            type="color"
-                            value={item.icon_color}
-                            onChange={(e) => updateItem(originalIndex, 'icon_color', e.target.value)}
-                            className="sr-only"
-                            id={`color-picker-${item.id || originalIndex}`}
-                          />
-                          <label
-                            htmlFor={`color-picker-${item.id || originalIndex}`}
-                            className="w-7 h-7 rounded-full border-2 border-border cursor-pointer block hover:scale-110 transition-transform"
-                            style={{ backgroundColor: item.icon_color }}
-                            title="Click to change icon color"
-                          />
-                        </div>
+                        <ColorPicker
+                          value={item.icon_color}
+                          onChange={(color) => updateItem(originalIndex, 'icon_color', color)}
+                          id={`color-picker-${item.id || originalIndex}`}
+                        />
                       </div>
                       <div
                         className="px-2 py-1.5"
