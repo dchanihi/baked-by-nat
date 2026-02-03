@@ -89,11 +89,18 @@ export const ColorPicker = ({ value, onChange, id }: ColorPickerProps) => {
     setOpen(false);
   };
 
+  const handleTriggerClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen(!open);
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
+          onClick={handleTriggerClick}
           className="w-7 h-7 rounded-full border-2 border-border cursor-pointer block hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           style={{ backgroundColor: value }}
           title="Click to change icon color"
