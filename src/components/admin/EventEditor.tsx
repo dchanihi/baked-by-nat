@@ -41,6 +41,7 @@ interface EventItem {
   price: number;
   starting_quantity: number;
   category: string | null;
+  icon_color: string;
 }
 
 interface ScheduleDay {
@@ -474,6 +475,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
         price: Number(item.price),
         starting_quantity: item.starting_quantity,
         category: (item as any).category || null,
+        icon_color: (item as any).icon_color || '#F5B8C9',
       })));
     }
   };
@@ -486,6 +488,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
       price: 0,
       starting_quantity: 0,
       category: null,
+      icon_color: '#F5B8C9',
     }]);
   };
 
@@ -504,6 +507,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
       price: 0,
       starting_quantity: 0,
       category: bake.category || null,
+      icon_color: '#F5B8C9',
     }]);
     setShowBakeSelector(false);
   };
@@ -666,6 +670,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
               price: item.price,
               starting_quantity: item.starting_quantity,
               category: item.category,
+              icon_color: item.icon_color,
             })
             .eq('id', item.id);
         }
@@ -684,6 +689,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                 price: item.price,
                 starting_quantity: item.starting_quantity,
                 category: item.category,
+                icon_color: item.icon_color,
               }))
             );
 
@@ -1313,9 +1319,10 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
 
           <div className="border rounded-lg overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_140px_100px_100px_80px_48px] bg-muted/50 border-b">
+            <div className="grid grid-cols-[1fr_140px_48px_100px_100px_80px_48px] bg-muted/50 border-b">
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground">Item Name</div>
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground">Category</div>
+              <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-center">Color</div>
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">COGS ($)</div>
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">Price ($)</div>
               <div className="px-3 py-2 text-xs font-medium text-muted-foreground text-center">Qty</div>
@@ -1345,7 +1352,7 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.15, ease: "easeOut" }}
-                      className="grid grid-cols-[1fr_140px_100px_100px_80px_48px] items-center bg-card"
+                      className="grid grid-cols-[1fr_140px_48px_100px_100px_80px_48px] items-center bg-card"
                     >
                       <div className="px-2 py-1.5">
                         <Input
@@ -1394,7 +1401,24 @@ export const EventEditor = ({ event, onSave, onCancel }: EventEditorProps) => {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div 
+                      <div className="px-2 py-1.5 flex justify-center">
+                        <div className="relative">
+                          <input
+                            type="color"
+                            value={item.icon_color}
+                            onChange={(e) => updateItem(originalIndex, 'icon_color', e.target.value)}
+                            className="sr-only"
+                            id={`color-picker-${item.id || originalIndex}`}
+                          />
+                          <label
+                            htmlFor={`color-picker-${item.id || originalIndex}`}
+                            className="w-7 h-7 rounded-full border-2 border-border cursor-pointer block hover:scale-110 transition-transform"
+                            style={{ backgroundColor: item.icon_color }}
+                            title="Click to change icon color"
+                          />
+                        </div>
+                      </div>
+                      <div
                         className="px-2 py-1.5"
                         ref={(el) => {
                           if (el) cellRefs.current.set(getCellKey(originalIndex, 0), el);

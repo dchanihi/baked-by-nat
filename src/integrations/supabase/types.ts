@@ -248,6 +248,7 @@ export type Database = {
           cogs: number
           created_at: string
           event_id: string
+          icon_color: string | null
           id: string
           name: string
           price: number
@@ -261,6 +262,7 @@ export type Database = {
           cogs?: number
           created_at?: string
           event_id: string
+          icon_color?: string | null
           id?: string
           name: string
           price: number
@@ -274,6 +276,7 @@ export type Database = {
           cogs?: number
           created_at?: string
           event_id?: string
+          icon_color?: string | null
           id?: string
           name?: string
           price?: number
