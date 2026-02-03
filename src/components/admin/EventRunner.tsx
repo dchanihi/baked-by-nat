@@ -22,6 +22,7 @@ interface EventItem {
   starting_quantity: number;
   quantity_sold: number;
   category: string | null;
+  icon_color: string;
 }
 interface CartItem {
   itemId: string;
@@ -30,6 +31,7 @@ interface CartItem {
   quantity: number;
   category: string | null;
   cogs: number;
+  icon_color: string;
 }
 interface Event {
   id: string;
@@ -325,7 +327,8 @@ export const EventRunner = ({
         price: item.price,
         quantity: 1,
         category: item.category,
-        cogs: item.cogs
+        cogs: item.cogs,
+        icon_color: item.icon_color
       }]);
     }
   };
@@ -665,7 +668,8 @@ export const EventRunner = ({
       price: Number(data.price),
       starting_quantity: data.starting_quantity,
       quantity_sold: data.quantity_sold,
-      category: data.category || null
+      category: data.category || null,
+      icon_color: (data as any).icon_color || '#F5B8C9'
     };
     setItems([...items, newItem]);
     setInventoryEdits({
@@ -710,7 +714,8 @@ export const EventRunner = ({
         price: Number(item.price),
         starting_quantity: item.starting_quantity,
         quantity_sold: item.quantity_sold,
-        category: item.category || null
+        category: item.category || null,
+        icon_color: (item as any).icon_color || '#F5B8C9'
       })) || [];
       setItems(loadedItems);
       // Initialize inventory edits
@@ -917,8 +922,11 @@ export const EventRunner = ({
               x: 50
             }} className="bg-secondary/50 rounded-lg p-3 w-full">
                     <div className="flex items-start gap-2 w-full">
-                      <div className="w-8 h-8 rounded-lg bg-pink-soft/10 flex items-center justify-center flex-shrink-0">
-                        <CategoryIcon className="w-4 h-4 text-pink-soft" />
+                      <div 
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${cartItem.icon_color}20` }}
+                      >
+                        <CategoryIcon className="w-4 h-4" style={{ color: cartItem.icon_color }} />
                       </div>
                       <div className="flex-1 min-w-0 overflow-hidden">
                         <p className="font-medium text-sm truncate">{cartItem.name}</p>
@@ -1418,8 +1426,14 @@ export const EventRunner = ({
                                           {cartQty}
                                         </Badge>
                                       )}
-                                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${isOutOfStock ? 'bg-muted' : 'bg-pink-soft/10'}`}>
-                                        <ItemCategoryIcon className={`w-8 h-8 ${isOutOfStock ? 'text-muted-foreground' : 'text-pink-soft'}`} />
+                                      <div 
+                                        className={`w-14 h-14 rounded-xl flex items-center justify-center ${isOutOfStock ? 'bg-muted' : ''}`}
+                                        style={{ backgroundColor: isOutOfStock ? undefined : `${item.icon_color}20` }}
+                                      >
+                                        <ItemCategoryIcon 
+                                          className={`w-8 h-8 ${isOutOfStock ? 'text-muted-foreground' : ''}`}
+                                          style={{ color: isOutOfStock ? undefined : item.icon_color }}
+                                        />
                                       </div>
                                       <span className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</span>
                                       <span className="text-lg font-bold text-primary">${item.price.toFixed(2)}</span>
@@ -1468,8 +1482,14 @@ export const EventRunner = ({
                                           {cartQty}
                                         </Badge>
                                       )}
-                                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${isOutOfStock ? 'bg-muted' : 'bg-pink-soft/10'}`}>
-                                        <Package className={`w-8 h-8 ${isOutOfStock ? 'text-muted-foreground' : 'text-pink-soft'}`} />
+                                      <div 
+                                        className={`w-14 h-14 rounded-xl flex items-center justify-center ${isOutOfStock ? 'bg-muted' : ''}`}
+                                        style={{ backgroundColor: isOutOfStock ? undefined : `${item.icon_color}20` }}
+                                      >
+                                        <Package 
+                                          className={`w-8 h-8 ${isOutOfStock ? 'text-muted-foreground' : ''}`}
+                                          style={{ color: isOutOfStock ? undefined : item.icon_color }}
+                                        />
                                       </div>
                                       <span className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</span>
                                       <span className="text-lg font-bold text-primary">${item.price.toFixed(2)}</span>
@@ -1508,8 +1528,14 @@ export const EventRunner = ({
                                   {cartQty}
                                 </Badge>
                               )}
-                              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${isOutOfStock ? 'bg-muted' : 'bg-pink-soft/10'}`}>
-                                <CategoryIcon className={`w-8 h-8 ${isOutOfStock ? 'text-muted-foreground' : 'text-pink-soft'}`} />
+                              <div 
+                                className={`w-14 h-14 rounded-xl flex items-center justify-center ${isOutOfStock ? 'bg-muted' : ''}`}
+                                style={{ backgroundColor: isOutOfStock ? undefined : `${item.icon_color}20` }}
+                              >
+                                <CategoryIcon 
+                                  className={`w-8 h-8 ${isOutOfStock ? 'text-muted-foreground' : ''}`}
+                                  style={{ color: isOutOfStock ? undefined : item.icon_color }}
+                                />
                               </div>
                               <span className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</span>
                               <span className="text-lg font-bold text-primary">${item.price.toFixed(2)}</span>
